@@ -209,7 +209,7 @@ function displayTeamData(data) {
     // Wykres rankingu
     createRankingChart(history.current);
 
-    // Ukryj loading, pokaż content
+    // Hide loading, show content
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
 }
