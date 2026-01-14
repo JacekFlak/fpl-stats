@@ -1,0 +1,470 @@
+let TEAM_ID = 8668;
+const API_BASE = 'https://fantasy.premierleague.com/api';
+
+async function fetchWithProxy(url) {
+    const proxies = [
+        '',
+        'https://corsproxy.io/?',
+        'https://api.codetabs.com/v1/proxy?quest=',
+    ];
+
+    for (let i = 0; i < proxies.length; i++) {
+        try {
+            const proxyUrl = proxies[i] ? `${proxies[i]}${encodeURIComponent(url)}` : url;
+            console.log(`Attempt ${i + 1}: ${proxies[i] ? 'with proxy' : 'direct'}`);
+            
+            const response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                mode: 'cors',
+                cache: 'no-cache'
+            });
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            console.log('Success!');
+            return data;
+        } catch (error) {
+            console.log(`Attempt ${i + 1} failed:`, error.message);
+            if (i === proxies.length - 1) throw error;
+        }
+    }
+}
+
+function getPositionName(type) {
+    const positions = { 1: 'GKP', 2: 'DEF', 3: 'MID', 4: 'FWD' };
+    return positions[type] || 'Unknown';
+}
+
+function getFixtureDifficulty(difficulty) {
+    if (difficulty <= 2) return 'easy';
+    if (difficulty <= 3) return 'medium';
+    return 'hard';
+}
+
+function calculateExpectedPoints(player, fixtures) {
+    // Simple AI algorithm based on form, fixtures, and price
+    let xP = 0;
+    const form = parseFloat(player.form) || 0;
+    const pointsPerGame = parseFloat(player.points_per_game) || 0;
+    
+    // If no form data, use basic calculation
+    if (form === 0 && pointsPerGame === 0) {
+        return player.total_points / Math.max(player.minutes / 90, 1) * 5;
+    }
+    
+    // Get next 5 fixtures
+    const playerFixtures = fixtures
+        .filter(f => f.team === player.team && !f.finished)
+        .sort((a, b) => a.event - b.event)
+        .slice(0, 5);
+    
+    if (playerFixtures.length === 0) {
+        // No fixtures found, use simple estimation
+        return (form * 2 + pointsPerGame * 3);
+    }
+    
+    playerFixtures.forEach(fixture => {
+        const difficulty = fixture.difficulty || 3;
+        const basePoints = (form * 0.4 + pointsPerGame * 0.6);
+        // Adjust based on fixture difficulty
+        const difficultyMultiplier = difficulty <= 2 ? 1.3 : difficulty <= 3 ? 1.0 : 0.7;
+        xP += basePoints * difficultyMultiplier;
+    });
+    
+    // If less than 5 fixtures, extrapolate
+    if (playerFixtures.length < 5 && playerFixtures.length > 0) {
+        const avgPerFixture = xP / playerFixtures.length;
+        xP = avgPerFixture * 5;
+    }
+    
+    return xP;
+}
+
+function analyzeTransfers(myPicks, allPlayers, fixtures, budget, teamData) {
+    const suggestions = [];
+    const playersById = {};
+    allPlayers.forEach(p => playersById[p.id] = p);
+    
+    console.log('Analyzing transfers with budget:', budget);
+    console.log('My picks:', myPicks.length);
+    console.log('All players:', allPlayers.length);
+    
+    // Calculate xP for all players
+    allPlayers.forEach(player => {
+        player.expectedPoints = calculateExpectedPoints(player, fixtures);
+        player.value = player.expectedPoints / (player.now_cost / 10);
+    });
+    
+    // Analyze each position
+    const myPlayerIds = myPicks.map(p => p.element);
+    const myPlayers = myPicks.map(p => {
+        const player = playersById[p.element];
+        if (player) {
+            return {
+                ...player,
+                pickData: p,
+                selling_price: player.now_cost // Use current cost as selling price
+            };
+        }
+        return null;
+    }).filter(p => p !== null);
+    
+    console.log('My players with data:', myPlayers.length);
+    
+    // Find underperforming players
+    myPlayers.forEach(myPlayer => {
+        if (!myPlayer) return;
+        
+        const position = myPlayer.element_type;
+        const myPlayerCost = myPlayer.now_cost / 10;
+        const myPlayerXP = myPlayer.expectedPoints || 0;
+        const maxBudget = budget + (myPlayer.selling_price / 10);
+        
+        console.log(`Analyzing ${myPlayer.web_name}: xP=${myPlayerXP.toFixed(1)}, Cost=£${myPlayerCost}m, Budget=£${maxBudget.toFixed(1)}m`);
+        
+        // Find better alternatives in same position
+        const alternatives = allPlayers
+            .filter(p => 
+                p.element_type === position &&
+                p.id !== myPlayer.id &&
+                !myPlayerIds.includes(p.id) && // Not already in team
+                p.now_cost / 10 <= maxBudget &&
+                p.expectedPoints > myPlayerXP * 1.1 && // At least 10% better
+                p.chance_of_playing_next_round !== 0 &&
+                p.status === 'a' // Available
+            )
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+        
+        console.log(`Found ${alternatives.length} alternatives for ${myPlayer.web_name}`);
+        
+        if (alternatives.length > 0) {
+            const best = alternatives[0];
+            const costDiff = (best.now_cost - myPlayer.now_cost) / 10;
+            
+            console.log(`Best alternative: ${best.web_name}, xP=${best.expectedPoints.toFixed(1)}, Cost=£${(best.now_cost/10).toFixed(1)}m`);
+            
+            suggestions.push({
+                playerOut: myPlayer,
+                playerIn: best,
+                costDiff: costDiff,
+                xPImprovement: (best.expectedPoints - myPlayerXP).toFixed(1),
+                reason: generateTransferReason(myPlayer, best, costDiff)
+            });
+        }
+    });
+    
+    console.log('Total suggestions:', suggestions.length);
+    
+    // Sort by value improvement
+    return suggestions.sort((a, b) => 
+        parseFloat(b.xPImprovement) - parseFloat(a.xPImprovement)
+    ).slice(0, 5);
+}
+
+function generateTransferReason(playerOut, playerIn, costDiff) {
+    const reasons = [];
+    
+    if (parseFloat(playerIn.form) > parseFloat(playerOut.form || 0)) {
+        reasons.push(`<strong>${playerIn.web_name}</strong> is in better form (${playerIn.form} vs ${playerOut.form || 0})`);
+    }
+    
+    if (playerIn.expectedPoints > playerOut.expectedPoints) {
+        reasons.push(`Expected to score <strong>${playerIn.expectedPoints.toFixed(1)}</strong> points in next 5 GWs vs ${playerOut.expectedPoints.toFixed(1)}`);
+    }
+    
+    if (costDiff < 0) {
+        reasons.push(`Saves you <strong>£${Math.abs(costDiff).toFixed(1)}m</strong> for other upgrades`);
+    } else if (costDiff === 0) {
+        reasons.push(`Same price - straight swap upgrade`);
+    } else {
+        reasons.push(`Costs extra <strong>£${costDiff.toFixed(1)}m</strong> but worth the investment`);
+    }
+    
+    return reasons.join('. ') + '.';
+}
+
+async function analyzeTeam() {
+    const input = document.getElementById('teamIdInput');
+    const newTeamId = parseInt(input.value);
+    
+    if (!newTeamId || newTeamId < 1) {
+        alert('Please enter a valid Team ID');
+        return;
+    }
+    
+    TEAM_ID = newTeamId;
+    
+    document.getElementById('teamName').textContent = 'Analyzing...';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    
+    try {
+        console.log('Fetching team data...');
+        const [teamData, bootstrapData] = await Promise.all([
+            fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/`),
+            fetchWithProxy(`${API_BASE}/bootstrap-static/`)
+        ]);
+        
+        console.log('Fetching current team picks...');
+        const currentEvent = bootstrapData.events.find(e => e.is_current)?.id || 1;
+        const picksData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/event/${currentEvent}/picks/`);
+        
+        console.log('Processing data...');
+        displayAnalysis(teamData, bootstrapData, picksData);
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Failed to load team data. Please try again.');
+    }
+}
+
+function displayAnalysis(teamData, bootstrapData, picksData) {
+    document.getElementById('teamName').textContent = teamData.name;
+    
+    const budget = teamData.last_deadline_bank / 10;
+    const teamValue = teamData.last_deadline_value / 10;
+    
+    // Budget Info
+    const budgetInfo = document.getElementById('budgetInfo');
+    budgetInfo.innerHTML = `
+        <div class="stat-card">
+            <div class="stat-label">Available Budget</div>
+            <div class="stat-value">£${budget.toFixed(1)}m</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Team Value</div>
+            <div class="stat-value">£${teamValue.toFixed(1)}m</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Free Transfers</div>
+            <div class="stat-value">${picksData.entry_history.event_transfers || 1}</div>
+        </div>
+    `;
+    
+    // Current Squad
+    const playersById = {};
+    bootstrapData.elements.forEach(p => playersById[p.id] = p);
+    
+    const teamsById = {};
+    bootstrapData.teams.forEach(t => teamsById[t.id] = t);
+    
+    // Create fixtures list from API data
+    const fixtures = [];
+    const currentEvent = bootstrapData.events.find(e => e.is_current)?.id || 1;
+    
+    // Get fixtures from bootstrap data
+    if (bootstrapData.fixtures) {
+        bootstrapData.fixtures.forEach(fixture => {
+            if (fixture.event >= currentEvent) {
+                // Home team
+                fixtures.push({
+                    event: fixture.event,
+                    team: fixture.team_h,
+                    difficulty: fixture.team_h_difficulty,
+                    finished: fixture.finished || false
+                });
+                // Away team
+                fixtures.push({
+                    event: fixture.event,
+                    team: fixture.team_a,
+                    difficulty: fixture.team_a_difficulty,
+                    finished: fixture.finished || false
+                });
+            }
+        });
+    }
+    
+    console.log('Fixtures loaded:', fixtures.length);
+    
+    const squadByPosition = { 1: [], 2: [], 3: [], 4: [] };
+    picksData.picks.forEach(pick => {
+        const player = playersById[pick.element];
+        if (player) {
+            player.pickData = pick;
+            player.expectedPoints = calculateExpectedPoints(player, fixtures);
+            squadByPosition[player.element_type].push(player);
+        }
+    });
+    
+    const currentSquad = document.getElementById('currentSquad');
+    let squadHTML = '';
+    
+    [1, 2, 3, 4].forEach(pos => {
+        const posName = getPositionName(pos);
+        const players = squadByPosition[pos];
+        
+        squadHTML += `
+            <div class="position-section">
+                <div class="position-title">
+                    <span>${posName}</span>
+                    <span>${players.length} players</span>
+                </div>
+                <div class="players-grid">
+                    ${players.map(p => `
+                        <div class="player-card">
+                            <div class="player-info">
+                                <div class="player-name">
+                                    ${p.web_name}
+                                    ${p.pickData.is_captain ? '(C)' : ''}
+                                    ${p.pickData.is_vice_captain ? '(VC)' : ''}
+                                </div>
+                                <div class="player-team">${teamsById[p.team].name}</div>
+                            </div>
+                            <div class="player-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Price</span>
+                                    <span class="stat-value">£${(p.now_cost / 10).toFixed(1)}m</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Form</span>
+                                    <span class="stat-value ${parseFloat(p.form) > 5 ? 'good' : parseFloat(p.form) < 3 ? 'bad' : ''}">${p.form}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">xP (5GW)</span>
+                                    <span class="stat-value good">${p.expectedPoints.toFixed(1)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    currentSquad.innerHTML = squadHTML;
+    
+    // AI Transfer Suggestions
+    const suggestions = analyzeTransfers(picksData.picks, bootstrapData.elements, fixtures, budget);
+    const transferSuggestions = document.getElementById('transferSuggestions');
+    
+    if (suggestions.length === 0) {
+        transferSuggestions.innerHTML = `
+            <div class="no-suggestions">
+                <div class="icon">✅</div>
+                <p>Your team looks great! No urgent transfers recommended right now.</p>
+            </div>
+        `;
+    } else {
+        transferSuggestions.innerHTML = suggestions.map((sug, idx) => `
+            <div class="transfer-suggestion">
+                <div class="transfer-header">
+                    <span class="ai-badge">AI Suggestion #${idx + 1}</span>
+                    <span>${sug.playerOut.web_name}</span>
+                    <span class="transfer-arrow">→</span>
+                    <span>${sug.playerIn.web_name}</span>
+                    <span class="position-badge">${getPositionName(sug.playerIn.element_type)}</span>
+                </div>
+                <div class="player-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Cost Change</span>
+                        <span class="stat-value ${sug.costDiff <= 0 ? 'good' : ''}">${sug.costDiff > 0 ? '+' : ''}£${sug.costDiff.toFixed(1)}m</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">xP Gain (5GW)</span>
+                        <span class="stat-value good">+${sug.xPImprovement} pts</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Form</span>
+                        <span class="stat-value">${sug.playerOut.form} → ${sug.playerIn.form}</span>
+                    </div>
+                </div>
+                <div class="transfer-reason">
+                    ${sug.reason}
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Top Players
+    const topPlayersByPosition = {};
+    [1, 2, 3, 4].forEach(pos => {
+        topPlayersByPosition[pos] = bootstrapData.elements
+            .filter(p => p.element_type === pos && p.chance_of_playing_next_round !== 0)
+            .sort((a, b) => calculateExpectedPoints(b, fixtures) - calculateExpectedPoints(a, fixtures))
+            .slice(0, 5);
+    });
+    
+    const topPlayers = document.getElementById('topPlayers');
+    let topPlayersHTML = '';
+    
+    [1, 2, 3, 4].forEach(pos => {
+        const posName = getPositionName(pos);
+        const players = topPlayersByPosition[pos];
+        
+        topPlayersHTML += `
+            <div class="position-section">
+                <div class="position-title">
+                    <span>${posName}</span>
+                </div>
+                <div class="players-grid">
+                    ${players.map(p => {
+                        const xP = calculateExpectedPoints(p, fixtures);
+                        return `
+                            <div class="player-card">
+                                <div class="player-info">
+                                    <div class="player-name">${p.web_name}</div>
+                                    <div class="player-team">${teamsById[p.team].name}</div>
+                                </div>
+                                <div class="player-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Price</span>
+                                        <span class="stat-value">£${(p.now_cost / 10).toFixed(1)}m</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Form</span>
+                                        <span class="stat-value good">${p.form}</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">xP (5GW)</span>
+                                        <span class="stat-value good">${xP.toFixed(1)}</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Selected</span>
+                                        <span class="stat-value">${p.selected_by_percent}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    topPlayers.innerHTML = topPlayersHTML;
+    
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+}
+
+function showError(message) {
+    document.getElementById('loading').style.display = 'none';
+    const errorDiv = document.getElementById('error');
+    errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+    errorDiv.style.display = 'block';
+}
+
+// Scroll to top functionality
+const scrollToTopBtn = document.getElementById('scrollToTop');
+
+window.addEventListener('scroll', () => {
+    if (window.pageYOffset > 300) {
+        scrollToTopBtn.classList.add('visible');
+    } else {
+        scrollToTopBtn.classList.remove('visible');
+    }
+});
+
+scrollToTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// Enter key to analyze
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('teamIdInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') analyzeTeam();
+    });
+});
