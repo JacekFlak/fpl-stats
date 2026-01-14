@@ -163,7 +163,7 @@ function displayTeamData(data) {
         const transferClass = transferCost > 0 ? 'negative' : '';
         const transfersMade = gw.event_transfers || 0;
         
-        // Określ kolor dla rankingu (porównanie z poprzednią kolejką)
+        // Determine color for ranking (comparison with previous gameweek)
         let rankClass = '';
         if (index < allHistory.length - 1) {
             const prevRank = allHistory[index + 1].overall_rank;
