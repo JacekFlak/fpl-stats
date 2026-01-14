@@ -96,10 +96,10 @@ function displayTeamData(data) {
         console.log('Summary overall rank:', team.summary_overall_rank);
         
         if (lastGW.overall_rank < prevGW.overall_rank) {
-            overallRankClass = 'rank positive'; // Poprawa (niższy numer = lepiej)
+            overallRankClass = 'rank positive'; // Improvement (lower number = better)
             console.log('Rank improved - GREEN');
         } else if (lastGW.overall_rank > prevGW.overall_rank) {
-            overallRankClass = 'rank negative'; // Pogorszenie (wyższy numer = gorzej)
+            overallRankClass = 'rank negative'; // Worsening (higher number = worse)
             console.log('Rank worsened - RED');
         }
     }
