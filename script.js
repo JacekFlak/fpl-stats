@@ -343,13 +343,13 @@ function createPointsChart(historyData, bootstrapData) {
     const labels = historyData.map(gw => `GW${gw.event}`);
     const points = historyData.map(gw => gw.points);
     
-    // Pobierz globalną średnią dla każdej kolejki z bootstrap data
+    // Get global average for each gameweek from bootstrap data
     const eventsMap = {};
     bootstrapData.events.forEach(event => {
         eventsMap[event.id] = event.average_entry_score;
     });
     
-    // Mapuj średnią dla każdej kolejki gracza
+    // Map the global average to each of the player's gameweeks
     const globalAverages = historyData.map(gw => eventsMap[gw.event] || 0);
     
     new Chart(ctx, {
