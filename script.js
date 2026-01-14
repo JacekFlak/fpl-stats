@@ -169,9 +169,9 @@ function displayTeamData(data) {
             const prevRank = allHistory[index + 1].overall_rank;
             const currentRank = gw.overall_rank;
             if (currentRank < prevRank) {
-                rankClass = 'positive'; // Poprawa (niższy ranking = lepsza pozycja)
+                rankClass = 'positive'; // Improvement (lower rank = better position)
             } else if (currentRank > prevRank) {
-                rankClass = 'negative'; // Pogorszenie (wyższy ranking = gorsza pozycja)
+                rankClass = 'negative'; // Worsening (higher rank = worse position)
             }
         }
         
