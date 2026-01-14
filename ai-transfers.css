@@ -1,0 +1,236 @@
+/* Additional styles for AI Transfers page */
+
+.nav-links {
+    margin-bottom: 15px;
+}
+
+.nav-links a {
+    color: #00ff87;
+    text-decoration: none;
+    font-size: 1.1em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.nav-links a:hover {
+    color: #04f5ff;
+    text-shadow: 0 0 10px rgba(0, 255, 135, 0.5);
+}
+
+.ai-suggestions {
+    background: linear-gradient(135deg, #37003c 0%, #04f5ff 5%, white 5%);
+    border-left: 5px solid #00ff87;
+}
+
+.ai-suggestions h2 {
+    color: #37003c;
+    border-color: #00ff87;
+}
+
+.player-card {
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    transition: all 0.3s ease;
+}
+
+.player-card:hover {
+    border-color: #00ff87;
+    box-shadow: 0 5px 15px rgba(0, 255, 135, 0.3);
+    transform: translateY(-2px);
+}
+
+.player-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.player-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #37003c;
+    margin-bottom: 5px;
+}
+
+.player-team {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.player-stats {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-label {
+    font-size: 0.8em;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #37003c;
+}
+
+.stat-value.good {
+    color: #00ff87;
+}
+
+.stat-value.bad {
+    color: #ff4444;
+}
+
+.transfer-suggestion {
+    background: linear-gradient(to right, #fff5f5 0%, #f0fff4 100%);
+    border-left: 5px solid #00ff87;
+    padding: 20px;
+    margin: 15px 0;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.transfer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #37003c;
+}
+
+.transfer-arrow {
+    color: #00ff87;
+    font-size: 1.5em;
+}
+
+.transfer-reason {
+    background: rgba(0, 255, 135, 0.1);
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-size: 0.95em;
+    line-height: 1.6;
+}
+
+.transfer-reason strong {
+    color: #37003c;
+}
+
+.ai-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #00ff87, #04f5ff);
+    color: #37003c;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.position-badge {
+    display: inline-block;
+    background: #37003c;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.fixtures-preview {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.fixture {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.fixture.easy {
+    background: #00ff87;
+    color: #37003c;
+}
+
+.fixture.medium {
+    background: #ffa500;
+    color: white;
+}
+
+.fixture.hard {
+    background: #ff4444;
+    color: white;
+}
+
+.no-suggestions {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 1.1em;
+}
+
+.no-suggestions .icon {
+    font-size: 3em;
+    margin-bottom: 10px;
+}
+
+/* Position sections */
+.position-section {
+    margin: 20px 0;
+}
+
+.position-title {
+    background: #37003c;
+    color: #00ff87;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.players-grid {
+    display: grid;
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .player-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .player-stats {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .transfer-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
