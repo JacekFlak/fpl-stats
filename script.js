@@ -203,7 +203,7 @@ function displayTeamData(data) {
         chipsDiv.innerHTML = '<p>No chips used this season yet.</p>';
     }
 
-    // Wykres punktów
+    // Points chart
     createPointsChart(history.current, bootstrap);
 
     // Wykres rankingu
