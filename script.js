@@ -4,7 +4,7 @@ const API_BASE = 'https://fantasy.premierleague.com/api';
 async function fetchWithProxy(url) {
     // Lista proxy do wypróbowania
     const proxies = [
-        '', // Najpierw spróbuj bez proxy
+        '', // First try without proxy
         'https://corsproxy.io/?',
         'https://api.codetabs.com/v1/proxy?quest=',
     ];
