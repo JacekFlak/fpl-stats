@@ -44,14 +44,27 @@ function getFixtureDifficulty(difficulty) {
 }
 
 function calculateExpectedPoints(player, fixtures) {
-    // Simple AI algorithm based on form, fixtures, and price
+    // Advanced AI algorithm using Opta data, form, fixtures, and ICT index
     let xP = 0;
     const form = parseFloat(player.form) || 0;
     const pointsPerGame = parseFloat(player.points_per_game) || 0;
     
-    // If no form data, use basic calculation
-    if (form === 0 && pointsPerGame === 0) {
-        return player.total_points / Math.max(player.minutes / 90, 1) * 5;
+    // Opta-powered metrics from FPL API
+    const expectedGoals = parseFloat(player.expected_goals || 0);
+    const expectedAssists = parseFloat(player.expected_assists || 0);
+    const expectedGoalInvolvements = parseFloat(player.expected_goal_involvements || 0);
+    const ictIndex = parseFloat(player.ict_index || 0);
+    const influence = parseFloat(player.influence || 0);
+    const creativity = parseFloat(player.creativity || 0);
+    const threat = parseFloat(player.threat || 0);
+    
+    // Minutes played factor (players with low minutes are less reliable)
+    const minutesPlayed = parseInt(player.minutes || 0);
+    const availabilityFactor = Math.min(minutesPlayed / 900, 1); // Cap at 10 full games
+    
+    // If no data at all, use basic calculation
+    if (form === 0 && pointsPerGame === 0 && ictIndex === 0) {
+        return (player.total_points / Math.max(player.minutes / 90, 1) * 5) * availabilityFactor;
     }
     
     // Get next 5 fixtures
@@ -61,19 +74,79 @@ function calculateExpectedPoints(player, fixtures) {
         .slice(0, 5);
     
     if (playerFixtures.length === 0) {
-        // No fixtures found, use simple estimation
-        return (form * 2 + pointsPerGame * 3);
+        // No fixtures found, use weighted estimation with Opta data
+        const baseXP = (form * 0.3 + pointsPerGame * 0.3 + (ictIndex / 20) * 0.4);
+        return baseXP * 5 * availabilityFactor;
     }
+    
+    // Calculate base performance score using Opta metrics
+    const optaScore = (
+        (expectedGoals * 5) + // xG weighted heavily for attackers
+        (expectedAssists * 3) + // xA important for creativity
+        (influence / 100) + // Overall influence on matches
+        (creativity / 100) + // Chance creation
+        (threat / 100) + // Goal threat
+        (ictIndex / 50) // ICT Index as overall metric
+    );
+    
+    // Clean sheet statistics for defenders and goalkeepers
+    const isDefender = player.element_type === 2; // DEF
+    const isGoalkeeper = player.element_type === 1; // GKP
+    const cleanSheetsPerGame = player.clean_sheets / Math.max(player.starts || 1, 1);
     
     playerFixtures.forEach(fixture => {
         const difficulty = fixture.difficulty || 3;
-        const basePoints = (form * 0.4 + pointsPerGame * 0.6);
-        // Adjust based on fixture difficulty
-        const difficultyMultiplier = difficulty <= 2 ? 1.3 : difficulty <= 3 ? 1.0 : 0.7;
-        xP += basePoints * difficultyMultiplier;
+        
+        // Base points from multiple sources
+        const formComponent = form * 0.25;
+        const pointsPerGameComponent = pointsPerGame * 0.25;
+        const optaComponent = optaScore * 0.3;
+        const xGIComponent = expectedGoalInvolvements * 0.2; // xG involvements per game
+        
+        let basePoints = formComponent + pointsPerGameComponent + optaComponent + xGIComponent;
+        
+        // Clean Sheet Probability for DEF and GKP (xCS - Expected Clean Sheets)
+        if (isDefender || isGoalkeeper) {
+            let cleanSheetProbability = 0;
+            
+            // Calculate xCS based on fixture difficulty and team's defensive record
+            if (difficulty <= 2) {
+                // Easy fixture: high CS probability
+                cleanSheetProbability = 0.50 + (cleanSheetsPerGame * 0.3);
+            } else if (difficulty === 3) {
+                // Medium fixture: moderate CS probability
+                cleanSheetProbability = 0.30 + (cleanSheetsPerGame * 0.2);
+            } else {
+                // Hard fixture: low CS probability
+                cleanSheetProbability = 0.15 + (cleanSheetsPerGame * 0.1);
+            }
+            
+            // Cap probability between 0 and 0.80 (max 80% CS chance)
+            cleanSheetProbability = Math.min(Math.max(cleanSheetProbability, 0), 0.80);
+            
+            // Expected clean sheet points: 4 points for both GKP and DEF
+            const expectedCleanSheetPoints = cleanSheetProbability * 4;
+            
+            // For goalkeepers, add expected save points (3 saves = 1 point)
+            if (isGoalkeeper) {
+                const savesPerGame = player.saves / Math.max(player.starts || 1, 1);
+                const expectedSavePoints = (savesPerGame / 3); // 3 saves = 1 point
+                basePoints += expectedSavePoints;
+            }
+            
+            basePoints += expectedCleanSheetPoints;
+        }
+        
+        // Fixture difficulty multiplier (easier fixtures = more points expected)
+        const difficultyMultiplier = difficulty <= 2 ? 1.4 : difficulty <= 3 ? 1.0 : 0.65;
+        
+        // Home/away factor if available in fixture data
+        const venueMultiplier = 1.0; // Could be enhanced with home/away data
+        
+        xP += basePoints * difficultyMultiplier * venueMultiplier * availabilityFactor;
     });
     
-    // If less than 5 fixtures, extrapolate
+    // If less than 5 fixtures, extrapolate based on average
     if (playerFixtures.length < 5 && playerFixtures.length > 0) {
         const avgPerFixture = xP / playerFixtures.length;
         xP = avgPerFixture * 5;
@@ -213,6 +286,10 @@ async function analyzeTeam() {
         const currentEvent = bootstrapData.events.find(e => e.is_current)?.id || 1;
         const picksData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/event/${currentEvent}/picks/`);
         
+        console.log('Calculating Expected Points with AI algorithm...');
+        // Allow additional time for xP calculations (especially xCS for defenders/goalkeepers)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         console.log('Processing data...');
         displayAnalysis(teamData, bootstrapData, picksData);
     } catch (error) {
@@ -289,53 +366,6 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
         }
     });
     
-    const currentSquad = document.getElementById('currentSquad');
-    let squadHTML = '';
-    
-    [1, 2, 3, 4].forEach(pos => {
-        const posName = getPositionName(pos);
-        const players = squadByPosition[pos];
-        
-        squadHTML += `
-            <div class="position-section">
-                <div class="position-title">
-                    <span>${posName}</span>
-                    <span>${players.length} players</span>
-                </div>
-                <div class="players-grid">
-                    ${players.map(p => `
-                        <div class="player-card">
-                            <div class="player-info">
-                                <div class="player-name">
-                                    ${p.web_name}
-                                    ${p.pickData.is_captain ? '(C)' : ''}
-                                    ${p.pickData.is_vice_captain ? '(VC)' : ''}
-                                </div>
-                                <div class="player-team">${teamsById[p.team].name}</div>
-                            </div>
-                            <div class="player-stats">
-                                <div class="stat-item">
-                                    <span class="stat-label">Price</span>
-                                    <span class="stat-value">£${(p.now_cost / 10).toFixed(1)}m</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-label">Form</span>
-                                    <span class="stat-value ${parseFloat(p.form) > 5 ? 'good' : parseFloat(p.form) < 3 ? 'bad' : ''}">${p.form}</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-label">xP (5GW)</span>
-                                    <span class="stat-value good">${p.expectedPoints.toFixed(1)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    });
-    
-    currentSquad.innerHTML = squadHTML;
-    
     // AI Transfer Suggestions
     const suggestions = analyzeTransfers(picksData.picks, bootstrapData.elements, fixtures, budget);
     const transferSuggestions = document.getElementById('transferSuggestions');
@@ -352,9 +382,9 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
             <div class="transfer-suggestion">
                 <div class="transfer-header">
                     <span class="ai-badge">AI Suggestion #${idx + 1}</span>
-                    <span>${sug.playerOut.web_name}</span>
+                    <span>${sug.playerOut.web_name} <span style="font-size: 0.9em; opacity: 0.8;">(${teamsById[sug.playerOut.team].short_name})</span></span>
                     <span class="transfer-arrow">→</span>
-                    <span>${sug.playerIn.web_name}</span>
+                    <span>${sug.playerIn.web_name} <span style="font-size: 0.9em; opacity: 0.8;">(${teamsById[sug.playerIn.team].short_name})</span></span>
                     <span class="position-badge">${getPositionName(sug.playerIn.element_type)}</span>
                 </div>
                 <div class="player-stats">

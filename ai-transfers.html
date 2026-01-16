@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Transfer Suggestions - FPL Stats</title>
+    <title>AI Transfers Suggestions - FPL Stats</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="ai-transfers.css">
@@ -11,7 +11,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🤖 AI Transfer Suggestions</h1>
+            <h1>🤖 AI Transfers Suggestions</h1>
             <nav class="nav-links">
                 <a href="index.html">← Back to Stats</a>
             </nav>
@@ -20,7 +20,7 @@
                 <input type="number" id="teamIdInput" value="8668" placeholder="Enter Team ID" min="1">
                 <button onclick="analyzeTeam()">Analyze Team</button>
             </div>
-            <div class="team-name" id="teamName">Enter Team ID to start</div>
+            <div class="team-name" id="teamName"></div>
         </header>
 
         <div id="loading" class="loading" style="display: none;">
@@ -34,12 +34,6 @@
             <!-- Team Budget Info -->
             <div class="stats-grid" id="budgetInfo"></div>
 
-            <!-- Current Squad -->
-            <div class="section">
-                <h2>Your Current Squad</h2>
-                <div id="currentSquad"></div>
-            </div>
-
             <!-- AI Transfer Suggestions -->
             <div class="section ai-suggestions">
                 <h2>🎯 AI Transfer Recommendations</h2>
@@ -50,6 +44,139 @@
             <div class="section">
                 <h2>Top Players by Expected Points (Next 5 GWs)</h2>
                 <div id="topPlayers"></div>
+            </div>
+
+            <!-- xP Methodology -->
+            <div class="section methodology">
+                <h2>📊 How Expected Points (xP) are Calculated</h2>
+                <div class="methodology-content">
+                    <p class="intro">Our AI uses an advanced algorithm powered by <strong>Opta professional statistics</strong> to predict player performance over the next 5 gameweeks.</p>
+                    
+                    <div class="formula-box">
+                        <h3>Main Formula</h3>
+                        <div class="formula">
+                            xP = (Form + PPG + Opta + xGI) × Difficulty × Availability × 5
+                        </div>
+                    </div>
+
+                    <div class="components-grid">
+                        <div class="component">
+                            <h4>🔥 Form Component (25%)</h4>
+                            <p>Recent performance trend from last gameweeks</p>
+                            <div class="formula-small">Form Score from FPL API</div>
+                        </div>
+
+                        <div class="component">
+                            <h4>📈 Points Per Game (25%)</h4>
+                            <p>Season average performance baseline</p>
+                            <div class="formula-small">Total Points ÷ Games Played</div>
+                        </div>
+
+                        <div class="component highlight">
+                            <h4>⚽ Opta Component (30%)</h4>
+                            <p><strong>Professional statistics</strong> from official Premier League data provider:</p>
+                            <ul>
+                                <li><strong>Expected Goals (xG)</strong> × 5 - Shot quality analysis</li>
+                                <li><strong>Expected Assists (xA)</strong> × 3 - Chance creation probability</li>
+                                <li><strong>Influence</strong> ÷ 100 - Match impact metric</li>
+                                <li><strong>Creativity</strong> ÷ 100 - Offensive contribution</li>
+                                <li><strong>Threat</strong> ÷ 100 - Attacking danger posed</li>
+                                <li><strong>ICT Index</strong> ÷ 50 - Combined statistical index</li>
+                            </ul>
+                        </div>
+
+                        <div class="component">
+                            <h4>🎯 xGI Component (20%)</h4>
+                            <p>Direct attacking contributions</p>
+                            <div class="formula-small">(xG + xA) per 90 minutes</div>
+                        </div>
+                    </div>
+
+                    <div class="multipliers">
+                        <h3>Adjustment Factors</h3>
+                        <div class="multiplier-grid">
+                            <div class="multiplier">
+                                <h4>🏟️ Fixture Difficulty</h4>
+                                <ul>
+                                    <li><span class="easy">Easy (FDR ≤ 2)</span>: 1.4× multiplier</li>
+                                    <li><span class="medium">Medium (FDR = 3)</span>: 1.0× baseline</li>
+                                    <li><span class="hard">Hard (FDR ≥ 4)</span>: 0.65× reduced</li>
+                                </ul>
+                            </div>
+                            <div class="multiplier">
+                                <h4>⏱️ Availability Factor</h4>
+                                <p>Based on minutes played (0-900 mins)</p>
+                                <div class="formula-small">min(minutes ÷ 900, 1.0)</div>
+                                <p class="small-text">Reduces xP for rotation-risk players</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="value-calculation">
+                        <h3>💰 Value Rating</h3>
+                        <div class="formula">
+                            Value = xP ÷ Price (£m)
+                        </div>
+                        <p>Identifies best expected points per million spent</p>
+                    </div>
+
+                    <div class="defensive-bonus">
+                        <h3>🛡️ Clean Sheet Probability (xCS) - For Defenders & Goalkeepers</h3>
+                        <p>Defenders and goalkeepers earn most points from clean sheets (4 pts). Our algorithm calculates <strong>Expected Clean Sheets (xCS)</strong> based on:</p>
+                        <div class="xcs-factors">
+                            <div class="xcs-factor">
+                                <h4>Fixture Difficulty Impact</h4>
+                                <ul>
+                                    <li><span class="easy">Easy (FDR ≤2)</span>: 50% base + team CS record</li>
+                                    <li><span class="medium">Medium (FDR=3)</span>: 30% base + team CS record</li>
+                                    <li><span class="hard">Hard (FDR≥4)</span>: 15% base + team CS record</li>
+                                </ul>
+                            </div>
+                            <div class="xcs-factor">
+                                <h4>Team Defensive Record</h4>
+                                <p>Historical clean sheets per game for the team</p>
+                                <div class="formula-small">Clean Sheets ÷ Games Started</div>
+                            </div>
+                        </div>
+                        <div class="formula">
+                            xCS Points = CS Probability × 4 points
+                        </div>
+                        <p class="goalkeeper-bonus"><strong>Goalkeeper Bonus:</strong> Expected save points added (avg saves per game ÷ 3)</p>
+                    </div>
+
+                    <div class="why-opta">
+                        <h3>Why Opta Data?</h3>
+                        <div class="opta-reasons">
+                            <div class="reason">
+                                <strong>✓ Objective</strong>
+                                <p>Based on actual match events, not opinions</p>
+                            </div>
+                            <div class="reason">
+                                <strong>✓ Predictive</strong>
+                                <p>xG and xA proven to forecast future performance</p>
+                            </div>
+                            <div class="reason">
+                                <strong>✓ Professional</strong>
+                                <p>Same data used by Premier League clubs</p>
+                            </div>
+                            <div class="reason">
+                                <strong>✓ Real-time</strong>
+                                <p>Updated continuously after each match</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="transfer-criteria">
+                        <h3>🔄 Transfer Recommendation Criteria</h3>
+                        <p>Transfers are suggested when the replacement player has:</p>
+                        <ul>
+                            <li>≥ <strong>10% higher xP</strong> than current squad player</li>
+                            <li>Price fits within your <strong>available budget</strong></li>
+                            <li>Player is <strong>available</strong> (not injured, chance of playing > 0%)</li>
+                            <li>Player <strong>not already</strong> in your squad</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
