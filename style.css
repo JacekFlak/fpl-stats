@@ -33,7 +33,7 @@ header {
 h1 {
     font-size: 2.5em;
     margin-bottom: 10px;
-    color: #00ff87;
+    color: #00cc6a;
 }
 
 .team-name {
@@ -163,12 +163,17 @@ h1 {
     font-weight: bold;
 }
 
+.stat-value.chips {
+    font-size: 1.8em;
+    line-height: 1.2;
+}
+
 .stat-value.rank {
-    color: #00ff87;
+    color: #00cc6a;
 }
 
 .stat-value.positive {
-    color: #00ff87 !important;
+    color: #00cc6a !important;
 }
 
 .stat-value.negative {
@@ -233,7 +238,7 @@ tr:hover {
 }
 
 td.positive {
-    color: #00ff87;
+    color: #00cc6a;
 }
 
 td.negative {
@@ -441,5 +446,221 @@ footer a:hover {
 
     table {
         min-width: 600px;
+    }
+}
+/* Pitch and Squad Visualization */
+.pitch-container {
+    margin: 20px 0;
+}
+
+.pitch {
+    background: linear-gradient(180deg, #2d8a3e 0%, #1f6b2e 50%, #2d8a3e 100%);
+    border: 3px solid white;
+    border-radius: 10px;
+    padding: 30px 20px;
+    position: relative;
+    min-height: 500px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.pitch::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.6);
+    transform: translateY(-50%);
+}
+
+.pitch::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 120px;
+    height: 120px;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.pitch-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.pitch-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.pitch-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.player-shirt {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7em;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(135deg, #37003c 0%, #04f5ff 100%);
+    border: 3px solid white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.player-shirt.captain::after {
+    content: 'C';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    background: #00ff87;
+    color: #37003c;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    border: 2px solid white;
+}
+
+.player-shirt.vice-captain::after {
+    content: 'V';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    background: #04f5ff;
+    color: #37003c;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    border: 2px solid white;
+}
+
+.player-name {
+    background: white;
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #37003c;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    white-space: nowrap;
+}
+
+.player-points {
+    background: #37003c;
+    color: #00cc6a;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.bench-section {
+    margin-top: 30px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.bench-section h3 {
+    color: #37003c;
+    margin-bottom: 15px;
+    font-size: 1.3em;
+    text-align: center;
+}
+
+.bench-players {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.bench-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.bench-player .player-shirt {
+    opacity: 0.7;
+    border-color: #ccc;
+}
+
+.bench-player .player-name {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.bench-player .player-points {
+    background: #666;
+    color: white;
+}
+
+/* Responsive pitch layout */
+@media (max-width: 768px) {
+    .pitch {
+        padding: 20px 10px;
+        min-height: 400px;
+    }
+
+    .pitch-row {
+        gap: 10px;
+    }
+
+    .pitch-player {
+        min-width: 60px;
+    }
+
+    .player-shirt {
+        width: 50px;
+        height: 50px;
+        font-size: 0.6em;
+    }
+
+    .player-name {
+        font-size: 0.75em;
+        padding: 4px 8px;
+    }
+
+    .player-points {
+        font-size: 0.75em;
+        padding: 3px 8px;
+    }
+
+    .bench-players {
+        gap: 10px;
     }
 }
