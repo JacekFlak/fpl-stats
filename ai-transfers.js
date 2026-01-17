@@ -43,7 +43,7 @@ function getFixtureDifficulty(difficulty) {
     return 'hard';
 }
 
-function calculateExpectedPoints(player, fixtures) {
+function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
     // Advanced AI algorithm using Opta data, form, fixtures, and ICT index
     let xP = 0;
     const form = parseFloat(player.form) || 0;
@@ -64,19 +64,19 @@ function calculateExpectedPoints(player, fixtures) {
     
     // If no data at all, use basic calculation
     if (form === 0 && pointsPerGame === 0 && ictIndex === 0) {
-        return (player.total_points / Math.max(player.minutes / 90, 1) * 5) * availabilityFactor;
+        return (player.total_points / Math.max(player.minutes / 90, 1) * numGameweeks) * availabilityFactor;
     }
     
-    // Get next 5 fixtures
+    // Get next N fixtures
     const playerFixtures = fixtures
         .filter(f => f.team === player.team && !f.finished)
         .sort((a, b) => a.event - b.event)
-        .slice(0, 5);
+        .slice(0, numGameweeks);
     
     if (playerFixtures.length === 0) {
         // No fixtures found, use weighted estimation with Opta data
         const baseXP = (form * 0.3 + pointsPerGame * 0.3 + (ictIndex / 20) * 0.4);
-        return baseXP * 5 * availabilityFactor;
+        return baseXP * numGameweeks * availabilityFactor;
     }
     
     // Calculate base performance score using Opta metrics
@@ -146,10 +146,10 @@ function calculateExpectedPoints(player, fixtures) {
         xP += basePoints * difficultyMultiplier * venueMultiplier * availabilityFactor;
     });
     
-    // If less than 5 fixtures, extrapolate based on average
-    if (playerFixtures.length < 5 && playerFixtures.length > 0) {
+    // If less than requested fixtures, extrapolate based on average
+    if (playerFixtures.length < numGameweeks && playerFixtures.length > 0) {
         const avgPerFixture = xP / playerFixtures.length;
-        xP = avgPerFixture * 5;
+        xP = avgPerFixture * numGameweeks;
     }
     
     return xP;
@@ -356,6 +356,12 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
     
     console.log('Fixtures loaded:', fixtures.length);
     
+    // Store fixtures globally for player comparison
+    fixturesData = fixtures;
+    
+    // Populate player comparison selects
+    populatePlayerSelects(bootstrapData.elements, teamsById);
+    
     const squadByPosition = { 1: [], 2: [], 3: [], 4: [] };
     picksData.picks.forEach(pick => {
         const player = playersById[pick.element];
@@ -498,3 +504,285 @@ window.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') analyzeTeam();
     });
 });
+
+// Global variables for comparison
+let allPlayersData = [];
+let fixturesData = [];
+let teamsData = {};
+let allPlayerOptions = [];
+
+function populatePlayerSelects(players, teams) {
+    allPlayersData = players;
+    teamsData = teams;
+    
+    const player1Select = document.getElementById('player1Select');
+    const player2Select = document.getElementById('player2Select');
+    
+    // Group players by position
+    const positions = {
+        1: 'GKP',
+        2: 'DEF',
+        3: 'MID',
+        4: 'FWD'
+    };
+    
+    // Sort players by position and name
+    const sortedPlayers = [...players].sort((a, b) => {
+        if (a.element_type !== b.element_type) {
+            return a.element_type - b.element_type;
+        }
+        return a.web_name.localeCompare(b.web_name);
+    });
+    
+    // Store all options for filtering
+    allPlayerOptions = sortedPlayers.map(player => {
+        const team = teams[player.team];
+        return {
+            id: player.id,
+            position: positions[player.element_type],
+            text: `${player.web_name} (${team.short_name}) - £${(player.now_cost / 10).toFixed(1)}m`,
+            searchText: `${player.web_name} ${team.short_name} ${team.name} ${positions[player.element_type]}`.toLowerCase()
+        };
+    });
+    
+    renderPlayerOptions(player1Select, allPlayerOptions);
+    renderPlayerOptions(player2Select, allPlayerOptions);
+}
+
+function renderPlayerOptions(selectElement, options) {
+    const positions = {};
+    
+    options.forEach(opt => {
+        if (!positions[opt.position]) {
+            positions[opt.position] = [];
+        }
+        positions[opt.position].push(opt);
+    });
+    
+    let html = '<option value="">Select player...</option>';
+    
+    ['GKP', 'DEF', 'MID', 'FWD'].forEach(pos => {
+        if (positions[pos] && positions[pos].length > 0) {
+            html += `<optgroup label="${pos}">`;
+            positions[pos].forEach(opt => {
+                html += `<option value="${opt.id}">${opt.text}</option>`;
+            });
+            html += '</optgroup>';
+        }
+    });
+    
+    selectElement.innerHTML = html;
+}
+
+function filterPlayerSelect(playerNum) {
+    const searchInput = document.getElementById(`player${playerNum}Search`);
+    const selectElement = document.getElementById(`player${playerNum}Select`);
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    
+    if (!searchTerm) {
+        renderPlayerOptions(selectElement, allPlayerOptions);
+        return;
+    }
+    
+    const filteredOptions = allPlayerOptions.filter(opt => 
+        opt.searchText.includes(searchTerm)
+    );
+    
+    renderPlayerOptions(selectElement, filteredOptions);
+}
+
+function comparePlayersXP() {
+    const player1Id = parseInt(document.getElementById('player1Select').value);
+    const player2Id = parseInt(document.getElementById('player2Select').value);
+    const resultDiv = document.getElementById('comparisonResult');
+    
+    // Get selected gameweeks
+    const selectedGameweeks = parseInt(document.querySelector('input[name="gameweeks"]:checked').value);
+    const gwText = selectedGameweeks === 1 ? 'GW' : 'GWs';
+    
+    if (!player1Id || !player2Id) {
+        resultDiv.innerHTML = `
+            <div class="comparison-error">
+                ⚠️ Please select both players to compare
+            </div>
+        `;
+        return;
+    }
+    
+    if (player1Id === player2Id) {
+        resultDiv.innerHTML = `
+            <div class="comparison-error">
+                ⚠️ Please select two different players
+            </div>
+        `;
+        return;
+    }
+    
+    const player1 = allPlayersData.find(p => p.id === player1Id);
+    const player2 = allPlayersData.find(p => p.id === player2Id);
+    
+    if (!player1 || !player2) {
+        resultDiv.innerHTML = `
+            <div class="comparison-error">
+                ⚠️ Error loading player data
+            </div>
+        `;
+        return;
+    }
+    
+    // Calculate xP for both players with selected gameweeks
+    player1.expectedPoints = calculateExpectedPoints(player1, fixturesData, selectedGameweeks);
+    player2.expectedPoints = calculateExpectedPoints(player2, fixturesData, selectedGameweeks);
+    
+    const xpDiff = Math.abs(player1.expectedPoints - player2.expectedPoints);
+    const winner = player1.expectedPoints > player2.expectedPoints ? player1 : player2;
+    const loser = player1.expectedPoints > player2.expectedPoints ? player2 : player1;
+    
+    const priceDiff = Math.abs(player1.now_cost - player2.now_cost) / 10;
+    const value1 = player1.expectedPoints / (player1.now_cost / 10);
+    const value2 = player2.expectedPoints / (player2.now_cost / 10);
+    
+    resultDiv.innerHTML = `
+        <div class="comparison-grid">
+            <div class="comparison-player ${player1.expectedPoints > player2.expectedPoints ? 'winner' : ''}">
+                <div class="player-comparison-header">
+                    <div class="player-name">${player1.web_name}</div>
+                    <div class="player-team">${teamsData[player1.team].name}</div>
+                    <div class="position-badge">${getPositionName(player1.element_type)}</div>
+                </div>
+                <div class="comparison-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Price</sp${selectedGameweeks} ${gwText}
+                        <span class="stat-value">£${(player1.now_cost / 10).toFixed(1)}m</span>
+                    </div>
+                    <div class="stat-row highlight">
+                        <span class="stat-label">xP (Next 5 GWs)</span>
+                        <span class="stat-value xp-value">${player1.expectedPoints.toFixed(1)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Value (xP/£)</span>
+                        <span class="stat-value">${value1.toFixed(2)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Form</span>
+                        <span class="stat-value">${player1.form}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Points/Game</span>
+                        <span class="stat-value">${player1.points_per_game}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Points</span>
+                        <span class="stat-value">${player1.total_points}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Selected By</span>
+                        <span class="stat-value">${player1.selected_by_percent}%</span>
+                    </div>
+                    ${player1.element_type === 1 || player1.element_type === 2 ? `
+                    <div class="stat-row">
+                        <span class="stat-label">Clean Sheets</span>
+                        <span class="stat-value">${player1.clean_sheets}</span>
+                    </div>
+                    ` : ''}
+                    ${player1.element_type >= 3 ? `
+                    <div class="stat-row">
+                        <span class="stat-label">Goals</span>
+                        <span class="stat-value">${player1.goals_scored}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Assists</span>
+                        <span class="stat-value">${player1.assists}</span>
+                    </div>
+                    ` : ''}
+                    <div class="stat-row">
+                        <span class="stat-label">Minutes</span>
+                        <span class="stat-value">${player1.minutes}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="vs-column">
+                <div class="vs-badge">VS</div>
+                <div class="winner-badge">
+                    ${player1.expectedPoints > player2.expectedPoints ? '👑 Winner' : player1.expectedPoints === player2.expectedPoints ? '🤝 Equal' : ''}
+                </div>
+            </div>
+            
+            <div class="comparison-player ${player2.expectedPoints > player1.expectedPoints ? 'winner' : ''}">
+                <div class="player-comparison-header">
+                    <div class="player-name">${player2.web_name}</div>
+                    <div class="player-team">${teamsData[player2.team].name}</div>
+                    <div class="position-badge">${getPositionName(player2.element_type)}</div>
+                </div>
+                <div class="comparison-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Price</sp${selectedGameweeks} ${gwText}
+                        <span class="stat-value">£${(player2.now_cost / 10).toFixed(1)}m</span>
+                    </div>
+                    <div class="stat-row highlight">
+                        <span class="stat-label">xP (Next 5 GWs)</span>
+                        <span class="stat-value xp-value">${player2.expectedPoints.toFixed(1)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Value (xP/£)</span>
+                        <span class="stat-value">${value2.toFixed(2)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Form</span>
+                        <span class="stat-value">${player2.form}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Points/Game</span>
+                        <span class="stat-value">${player2.points_per_game}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Points</span>
+                        <span class="stat-value">${player2.total_points}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Selected By</span>
+                        <span class="stat-value">${player2.selected_by_percent}%</span>
+                    </div>
+                    ${player2.element_type === 1 || player2.element_type === 2 ? `
+                    <div class="stat-row">
+                        <span class="stat-label">Clean Sheets</span>
+                        <span class="stat-value">${player2.clean_sheets}</span>
+                    </div>
+                    ` : ''}
+                    ${player2.element_type >= 3 ? `
+                    <div class="stat-row">
+                        <span class="stat-label">Goals</span>
+                        <span class="stat-value">${player2.goals_scored}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Assists</span>
+                        <span class="stat-value">${player2.assists}</span>
+                    </div>
+                    ` : ''}
+                    <div class="stat-row">
+                        <span class="stat-label">Minutes</span>
+                        <span class="stat-value">${player2.minutes}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="comparison-summary">
+            <h3>📊 Comparison Summary</h3>${selectedGameweeks} ${gwText.toLowerCase()}
+            <div class="summary-content">
+                <p><strong>${winner.web_name}</strong> has a higher expected points total with <strong>${winner.expectedPoints.toFixed(1)} xP</strong> 
+                compared to <strong>${loser.web_name}'s ${loser.expectedPoints.toFixed(1)} xP</strong> 
+                - a difference of <strong>${xpDiff.toFixed(1)} points</strong> over the next 5 gameweeks.</p>
+                
+                ${priceDiff > 0 ? `
+                <p>Price difference: <strong>£${priceDiff.toFixed(1)}m</strong> 
+                (${player1.now_cost > player2.now_cost ? player1.web_name + ' is more expensive' : player2.web_name + ' is more expensive'})</p>
+                ` : '<p>Both players are priced the same.</p>'}
+                
+                <p>Best value: <strong>${value1 > value2 ? player1.web_name : player2.web_name}</strong> 
+                with <strong>${Math.max(value1, value2).toFixed(2)}</strong> expected points per million.</p>
+            </div>
+        </div>
+    `;
+}

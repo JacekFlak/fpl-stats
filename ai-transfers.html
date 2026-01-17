@@ -40,6 +40,47 @@
                 <div id="transferSuggestions"></div>
             </div>
 
+            <!-- Player Comparison -->
+            <div class="section player-comparison">
+                <h2>⚖️ Compare Two Players (xP)</h2>
+                <div class="gameweeks-selector">
+                    <label>Compare for:</label>
+                    <div class="gw-options">
+                        <label class="gw-option">
+                            <input type="radio" name="gameweeks" value="1">
+                            <span>Next 1 GW</span>
+                        </label>
+                        <label class="gw-option">
+                            <input type="radio" name="gameweeks" value="3">
+                            <span>Next 3 GWs</span>
+                        </label>
+                        <label class="gw-option">
+                            <input type="radio" name="gameweeks" value="5" checked>
+                            <span>Next 5 GWs</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="comparison-controls">
+                    <div class="player-select-group">
+                        <label for="player1Select">Player 1:</label>
+                        <input type="text" id="player1Search" class="player-search" placeholder="🔍 Search player..." oninput="filterPlayerSelect(1)">
+                        <select id="player1Select" class="player-select" size="8">
+                            <option value="">Select player...</option>
+                        </select>
+                    </div>
+                    <div class="vs-divider">VS</div>
+                    <div class="player-select-group">
+                        <label for="player2Select">Player 2:</label>
+                        <input type="text" id="player2Search" class="player-search" placeholder="🔍 Search player..." oninput="filterPlayerSelect(2)">
+                        <select id="player2Select" class="player-select" size="8">
+                            <option value="">Select player...</option>
+                        </select>
+                    </div>
+                    <button onclick="comparePlayersXP()" class="compare-button">Compare</button>
+                </div>
+                <div id="comparisonResult"></div>
+            </div>
+
             <!-- Players to Consider -->
             <div class="section">
                 <h2>Top Players by Expected Points (Next 5 GWs)</h2>
