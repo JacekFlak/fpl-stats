@@ -543,7 +543,7 @@ function createRankingChart(historyData) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: true,
@@ -584,6 +584,27 @@ function createRankingChart(historyData) {
                             }
                             return '';
                         }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'xy',
+                        modifierKey: null
+                    },
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                            speed: 0.1
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy'
+                    },
+                    limits: {
+                        x: {min: 'original', max: 'original'},
+                        y: {min: 'original', max: 'original'}
                     }
                 }
             },
@@ -688,7 +709,7 @@ function createPointsChart(historyData, bootstrapData) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: true,
@@ -717,6 +738,27 @@ function createPointsChart(historyData, bootstrapData) {
                                 return `Average: ${context.parsed.y.toFixed(1)}`;
                             }
                         }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'xy',
+                        modifierKey: null
+                    },
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                            speed: 0.1
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy'
+                    },
+                    limits: {
+                        x: {min: 'original', max: 'original'},
+                        y: {min: 'original', max: 'original'}
                     }
                 }
             },
@@ -877,4 +919,53 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Hide loading, show empty state
     document.getElementById('loading').style.display = 'none';
+});
+// Chart zoom and fullscreen functions
+function resetChartZoom(chartId) {
+    const chart = Chart.getChart(chartId);
+    if (chart) {
+        chart.resetZoom();
+    }
+}
+
+function toggleFullscreen(elementId) {
+    const element = document.getElementById(elementId);
+    
+    if (!document.fullscreenElement) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+        element.classList.add('fullscreen-mode');
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        element.classList.remove('fullscreen-mode');
+    }
+}
+
+// Listen for fullscreen changes
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+        const containers = ['pointsChartContainer', 'rankingChartContainer'];
+        containers.forEach(containerId => {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.classList.remove('fullscreen-mode');
+            }
+        });
+    }
+    // Resize charts when exiting fullscreen
+    const pointsChart = Chart.getChart('pointsChart');
+    const rankingChart = Chart.getChart('rankingChart');
+    if (pointsChart) setTimeout(() => pointsChart.resize(), 100);
+    if (rankingChart) setTimeout(() => rankingChart.resize(), 100);
 });

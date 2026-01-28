@@ -510,6 +510,7 @@ let allPlayersData = [];
 let fixturesData = [];
 let teamsData = {};
 let allPlayerOptions = [];
+let comparisonChart = null;
 
 function populatePlayerSelects(players, teams) {
     allPlayersData = players;
@@ -641,6 +642,9 @@ function comparePlayersXP() {
     const priceDiff = Math.abs(player1.now_cost - player2.now_cost) / 10;
     const value1 = player1.expectedPoints / (player1.now_cost / 10);
     const value2 = player2.expectedPoints / (player2.now_cost / 10);
+    
+    // Show chart
+    createComparisonChart(player1, player2, selectedGameweeks);
     
     resultDiv.innerHTML = `
         <div class="comparison-grid">
@@ -786,3 +790,216 @@ function comparePlayersXP() {
         </div>
     `;
 }
+function createComparisonChart(player1, player2, gameweeks) {
+    const chartContainer = document.getElementById('comparisonChart');
+    chartContainer.style.display = 'block';
+    
+    const ctx = document.getElementById('playerComparisonCanvas');
+    
+    // Destroy existing chart if it exists
+    if (comparisonChart) {
+        comparisonChart.destroy();
+    }
+    
+    const value1 = player1.expectedPoints / (player1.now_cost / 10);
+    const value2 = player2.expectedPoints / (player2.now_cost / 10);
+    
+    const labels = [
+        'xP (Expected Points)',
+        'Form',
+        'Points/Game',
+        'Value (xP/£m)',
+        'Total Points',
+        'Selected By %'
+    ];
+    
+    const data1 = [
+        player1.expectedPoints,
+        parseFloat(player1.form) || 0,
+        parseFloat(player1.points_per_game) || 0,
+        value1,
+        player1.total_points / 10, // Scale down for better visualization
+        parseFloat(player1.selected_by_percent) || 0
+    ];
+    
+    const data2 = [
+        player2.expectedPoints,
+        parseFloat(player2.form) || 0,
+        parseFloat(player2.points_per_game) || 0,
+        value2,
+        player2.total_points / 10, // Scale down for better visualization
+        parseFloat(player2.selected_by_percent) || 0
+    ];
+    
+    comparisonChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: player1.web_name,
+                    data: data1,
+                    backgroundColor: 'rgba(0, 204, 106, 0.7)',
+                    borderColor: 'rgba(0, 204, 106, 1)',
+                    borderWidth: 2
+                },
+                {
+                    label: player2.web_name,
+                    data: data2,
+                    backgroundColor: 'rgba(4, 245, 255, 0.7)',
+                    borderColor: 'rgba(4, 245, 255, 1)',
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        padding: 15,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const value = context.parsed.y;
+                            // Format based on metric
+                            if (context.label.includes('Total Points')) {
+                                label += (value * 10).toFixed(0); // Scale back up
+                            } else if (context.label.includes('Value')) {
+                                label += value.toFixed(2);
+                            } else {
+                                label += value.toFixed(1);
+                            }
+                            return label;
+                        }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'xy',
+                        modifierKey: null
+                    },
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                            speed: 0.1
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy'
+                    },
+                    limits: {
+                        x: {min: 'original', max: 'original'},
+                        y: {min: 'original', max: 'original'}
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: {
+                            size: 12
+                        },
+                        callback: function(value) {
+                            return value.toFixed(1);
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 11,
+                            weight: 'bold'
+                        },
+                        autoSkip: false,
+                        maxRotation: 45,
+                        minRotation: 0
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+    
+    // Scroll to chart
+    chartContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetChartZoom() {
+    if (comparisonChart) {
+        comparisonChart.resetZoom();
+    }
+}
+
+function toggleFullscreen(elementId) {
+    const element = document.getElementById(elementId);
+    
+    if (!document.fullscreenElement) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+        element.classList.add('fullscreen-mode');
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        element.classList.remove('fullscreen-mode');
+    }
+}
+
+// Listen for fullscreen changes
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+        const chartContainer = document.getElementById('comparisonChart');
+        if (chartContainer) {
+            chartContainer.classList.remove('fullscreen-mode');
+        }
+    }
+    // Resize chart when exiting fullscreen
+    if (comparisonChart) {
+        setTimeout(() => comparisonChart.resize(), 100);
+    }
+});

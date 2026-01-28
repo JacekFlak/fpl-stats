@@ -6,7 +6,9 @@
     <title>Fantasy Premier League - Team Statistics</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚽</text></svg>">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -56,14 +58,36 @@
 
             <!-- Points Chart -->
             <div class="section">
-                <h2>Season Points Chart</h2>
-                <canvas id="pointsChart" style="max-height: 400px;"></canvas>
+                <div class="chart-container" id="pointsChartContainer">
+                    <div class="chart-header">
+                        <h2>Season Points Chart</h2>
+                        <button class="fullscreen-btn" onclick="toggleFullscreen('pointsChartContainer')" title="Fullscreen / Pinch to zoom">⛶</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="pointsChart"></canvas>
+                    </div>
+                    <div class="zoom-controls">
+                        <button onclick="resetChartZoom('pointsChart')" class="zoom-btn">Reset Zoom</button>
+                        <span class="zoom-hint">💡 Pinch or scroll to zoom • Drag to pan</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Ranking Chart -->
             <div class="section">
-                <h2>Overall Ranking Changes</h2>
-                <canvas id="rankingChart" style="max-height: 400px;"></canvas>
+                <div class="chart-container" id="rankingChartContainer">
+                    <div class="chart-header">
+                        <h2>Overall Ranking Changes</h2>
+                        <button class="fullscreen-btn" onclick="toggleFullscreen('rankingChartContainer')" title="Fullscreen / Pinch to zoom">⛶</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="rankingChart"></canvas>
+                    </div>
+                    <div class="zoom-controls">
+                        <button onclick="resetChartZoom('rankingChart')" class="zoom-btn">Reset Zoom</button>
+                        <span class="zoom-hint">💡 Pinch or scroll to zoom • Drag to pan</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Season History -->
