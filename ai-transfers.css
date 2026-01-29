@@ -115,6 +115,143 @@
     color: #37003c;
 }
 
+.fixtures-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin: 15px 0;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+}
+
+.fixtures-column h5 {
+    margin: 0 0 10px 0;
+    font-size: 0.9em;
+    color: #37003c;
+    font-weight: bold;
+}
+
+.fixtures-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fixture-item {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    font-weight: bold;
+    text-align: center;
+}
+
+.fixture-item.very-easy {
+    background: #00b359;
+    color: white;
+}
+
+.fixture-item.easy {
+    background: #00ff87;
+    color: #37003c;
+}
+
+.fixture-item.medium {
+    background: #ffa500;
+    color: white;
+}
+
+.fixture-item.hard {
+    background: #ff4444;
+    color: white;
+}
+
+.fixture-item.very-hard {
+    background: #cc0000;
+    color: white;
+}
+
+.no-fixtures {
+    color: #999;
+    font-style: italic;
+    font-size: 0.85em;
+}
+
+/* FDR Legend */
+.fdr-legend {
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.fdr-legend h4 {
+    color: #37003c;
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    text-align: center;
+}
+
+.fdr-legend-items {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.fdr-legend-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.fdr-legend-item span:last-child {
+    font-size: 0.85em;
+    color: #666;
+    font-weight: 500;
+}
+
+.fdr-box {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.fdr-box.very-easy {
+    background: #00b359;
+    color: white;
+}
+
+.fdr-box.easy {
+    background: #00ff87;
+    color: #37003c;
+}
+
+.fdr-box.medium {
+    background: #ffa500;
+    color: white;
+}
+
+.fdr-box.hard {
+    background: #ff4444;
+    color: white;
+}
+
+.fdr-box.very-hard {
+    background: #cc0000;
+    color: white;
+}
+
 .transfer-arrow {
     color: #00cc6a;
     font-size: 1.5em;
@@ -262,6 +399,26 @@
     margin-bottom: 1.5rem;
     font-size: 1.8rem;
     text-align: center;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.methodology h2:hover {
+    color: #04f5ff;
+}
+
+.methodology h2 .toggle-icon {
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+
+.methodology h2 .toggle-icon.rotated {
+    transform: rotate(-180deg);
 }
 
 .methodology-content {
@@ -631,6 +788,73 @@
     border-color: #04f5ff;
 }
 
+.position-selector {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #f0f4ff 0%, #fff5f0 100%);
+    border-radius: 8px;
+    border: 2px solid #04f5ff;
+}
+
+.position-selector label {
+    display: block;
+    font-weight: bold;
+    color: #37003c;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.position-options {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.position-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+    font-size: 1.05em;
+}
+
+.position-option:hover {
+    border-color: #04f5ff;
+    background: #f0fdff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(4, 245, 255, 0.2);
+}
+
+.position-option input[type="radio"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: #04f5ff;
+}
+
+.position-option span {
+    font-weight: 600;
+    color: #37003c;
+}
+
+.position-option:has(input:checked) {
+    background: linear-gradient(135deg, #04f5ff, #00cc6a);
+    border-color: #04f5ff;
+    box-shadow: 0 4px 12px rgba(4, 245, 255, 0.4);
+}
+
+.position-option:has(input:checked) span {
+    color: white;
+    font-weight: 700;
+}
+
 .gameweeks-selector {
     margin-bottom: 20px;
     padding: 15px;
@@ -909,6 +1133,84 @@
 
 .summary-content strong {
     color: #37003c;
+}
+
+.recent-history {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #f0f0f0;
+}
+
+.recent-history h4 {
+    color: #37003c;
+    font-size: 1em;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.history-item {
+    display: grid;
+    grid-template-columns: 50px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f9f9f9;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.history-gw {
+    font-weight: bold;
+    color: #666;
+    font-size: 0.85em;
+}
+
+.history-opponent {
+    color: #37003c;
+    font-weight: 500;
+}
+
+.history-points {
+    font-weight: bold;
+    text-align: right;
+    font-size: 1.05em;
+}
+
+.history-points.good {
+    color: #00cc6a;
+}
+
+.history-points.ok {
+    color: #ff9800;
+}
+
+.history-points.bad {
+    color: #ff4444;
+}
+
+.upcoming-fixtures {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #f0f0f0;
+}
+
+.upcoming-fixtures h4 {
+    color: #37003c;
+    font-size: 1em;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.upcoming-fixtures .fixtures-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .comparison-error {

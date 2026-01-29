@@ -43,9 +43,57 @@
                 <div id="transferSuggestions"></div>
             </div>
 
+            <!-- FDR Legend -->
+            <div class="fdr-legend">
+                <h4>📊 Fixture Difficulty Rating (FDR) Legend</h4>
+                <div class="fdr-legend-items">
+                    <div class="fdr-legend-item">
+                        <span class="fdr-box very-easy">1</span>
+                        <span>Very Easy</span>
+                    </div>
+                    <div class="fdr-legend-item">
+                        <span class="fdr-box easy">2</span>
+                        <span>Easy</span>
+                    </div>
+                    <div class="fdr-legend-item">
+                        <span class="fdr-box medium">3</span>
+                        <span>Medium</span>
+                    </div>
+                    <div class="fdr-legend-item">
+                        <span class="fdr-box hard">4</span>
+                        <span>Hard</span>
+                    </div>
+                    <div class="fdr-legend-item">
+                        <span class="fdr-box very-hard">5</span>
+                        <span>Very Hard</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Player Comparison -->
             <div class="section player-comparison">
                 <h2>⚖️ Compare Two Players (xP)</h2>
+                <div class="position-selector">
+                    <label>Select Position:</label>
+                    <div class="position-options">
+                        <label class="position-option">
+                            <input type="radio" name="position" value="1" onchange="updatePlayerListsByPosition()">
+                            <span>🧤 GKP</span>
+                        </label>
+                        <label class="position-option">
+                            <input type="radio" name="position" value="2" onchange="updatePlayerListsByPosition()">
+                            <span>🛡️ DEF</span>
+                        </label>
+                        <label class="position-option">
+                            <input type="radio" name="position" value="3" checked onchange="updatePlayerListsByPosition()">
+                            <span>⚽ MID</span>
+                        </label>
+                        <label class="position-option">
+                            <input type="radio" name="position" value="4" onchange="updatePlayerListsByPosition()">
+                            <span>🎯 FWD</span>
+                        </label>
+                    </div>
+                </div>
                 <div class="gameweeks-selector">
                     <label>Compare for:</label>
                     <div class="gw-options">
@@ -84,17 +132,40 @@
                 <div id="comparisonChart" class="chart-container" style="display: none;">
                     <div class="chart-header">
                         <h3>📊 Visual Comparison</h3>
-                        <button class="fullscreen-btn" onclick="toggleFullscreen('comparisonChart')" title="Fullscreen / Pinch to zoom">⛶</button>
+                        <button class="fullscreen-btn" onclick="toggleFullscreen('comparisonChart')" title="Fullscreen">⛶</button>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="playerComparisonCanvas"></canvas>
                     </div>
-                    <div class="zoom-controls">
-                        <button onclick="resetChartZoom()" class="zoom-btn">Reset Zoom</button>
-                        <span class="zoom-hint">💡 Pinch or scroll to zoom • Drag to pan</span>
-                    </div>
                 </div>
                 <div id="comparisonResult"></div>
+                
+                <!-- FDR Legend for Comparison -->
+                <div class="fdr-legend">
+                    <h4>📊 Fixture Difficulty Rating (FDR) Legend</h4>
+                    <div class="fdr-legend-items">
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box very-easy">1</span>
+                            <span>Very Easy</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box easy">2</span>
+                            <span>Easy</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box medium">3</span>
+                            <span>Medium</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box hard">4</span>
+                            <span>Hard</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box very-hard">5</span>
+                            <span>Very Hard</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Players to Consider -->
@@ -105,8 +176,11 @@
 
             <!-- xP Methodology -->
             <div class="section methodology">
-                <h2>📊 How Expected Points (xP) are Calculated</h2>
-                <div class="methodology-content">
+                <h2 class="collapsible-header" onclick="toggleMethodology()">
+                    📊 How Expected Points (xP) are Calculated
+                    <span class="toggle-icon">▼</span>
+                </h2>
+                <div class="methodology-content" id="methodologyContent" style="display: none;">
                     <p class="intro">Our AI uses an advanced algorithm powered by <strong>Opta professional statistics</strong> to predict player performance over the next 5 gameweeks.</p>
                     
                     <div class="formula-box">
@@ -161,10 +235,15 @@
                                 </ul>
                             </div>
                             <div class="multiplier">
-                                <h4>⏱️ Availability Factor</h4>
-                                <p>Based on minutes played (0-900 mins)</p>
-                                <div class="formula-small">min(minutes ÷ 900, 1.0)</div>
-                                <p class="small-text">Reduces xP for rotation-risk players</p>
+                                <h4>⏱️ Playing Time Factor</h4>
+                                <p>Based on average minutes per game:</p>
+                                <ul>
+                                    <li><span class="easy">60+ min/game</span>: 1.0× (regular starter)</li>
+                                    <li><span class="medium">45-60 min/game</span>: 0.75× (rotation risk)</li>
+                                    <li><span class="hard">30-45 min/game</span>: 0.5× (high rotation)</li>
+                                    <li><span class="hard">&lt;30 min/game</span>: 0.3× (bench player)</li>
+                                </ul>
+                                <p class="small-text">Also adjusted by injury status (chance of playing %)</p>
                             </div>
                         </div>
                     </div>
@@ -240,6 +319,8 @@
 
     <footer>
         <p>Powered by <a href="https://jacek-flak.com" target="_blank" rel="noopener noreferrer">jSoft Jacek Flak</a></p>
+        <p class="disclaimer">This website is an independent fan project.<br>
+        It is not affiliated with or endorsed by the Premier League or any football club.</p>
     </footer>
 
     <button id="scrollToTop" class="scroll-to-top" title="Scroll to top">↑</button>
