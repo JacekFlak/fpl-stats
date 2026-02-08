@@ -295,6 +295,13 @@ footer a:hover {
     text-shadow: 0 0 10px rgba(0, 255, 135, 0.5);
 }
 
+footer .disclaimer {
+    margin-top: 15px;
+    font-size: 0.75em;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+}
+
 /* Scroll to top button */
 .scroll-to-top {
     position: fixed;
