@@ -37,10 +37,54 @@ function getPositionName(type) {
     return positions[type] || 'Unknown';
 }
 
+function getNextFixtures(player, fixtures, teamsById, count = 5) {
+    if (!fixtures || fixtures.length === 0) {
+        console.warn('No fixtures data available');
+        return [];
+    }
+    
+    console.log(`Getting fixtures for player team ${player.team}, total fixtures: ${fixtures.length}`);
+    
+    const playerFixtures = fixtures
+        .filter(f => !f.finished && (f.team_h === player.team || f.team_a === player.team))
+        .sort((a, b) => a.event - b.event)
+        .slice(0, count);
+    
+    console.log(`Found ${playerFixtures.length} fixtures for team ${player.team}`);
+    
+    return playerFixtures.map(fixture => {
+        const isHome = fixture.team_h === player.team;
+        const opponentId = isHome ? fixture.team_a : fixture.team_h;
+        const opponent = teamsById[opponentId];
+        const difficulty = isHome ? fixture.team_h_difficulty : fixture.team_a_difficulty;
+        
+        return {
+            opponent: opponent ? opponent.short_name : 'TBA',
+            isHome: isHome,
+            difficulty: difficulty,
+            difficultyClass: getFixtureDifficulty(difficulty)
+        };
+    });
+}
+
 function getFixtureDifficulty(difficulty) {
-    if (difficulty <= 2) return 'easy';
-    if (difficulty <= 3) return 'medium';
-    return 'hard';
+    if (difficulty === 1) return 'very-easy';
+    if (difficulty === 2) return 'easy';
+    if (difficulty === 3) return 'medium';
+    if (difficulty === 4) return 'hard';
+    return 'very-hard'; // FDR 5
+}
+
+async function fetchPlayerHistory(playerId) {
+    try {
+        const data = await fetchWithProxy(`${API_BASE}/element-summary/${playerId}/`);
+        // Get last 5 matches history
+        const history = data.history || [];
+        return history.slice(-5).reverse(); // Last 5 games, most recent first
+    } catch (error) {
+        console.error('Error fetching player history:', error);
+        return [];
+    }
 }
 
 function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
@@ -58,9 +102,35 @@ function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
     const creativity = parseFloat(player.creativity || 0);
     const threat = parseFloat(player.threat || 0);
     
-    // Minutes played factor (players with low minutes are less reliable)
+    // Advanced minutes played analysis - considering recent playing time
     const minutesPlayed = parseInt(player.minutes || 0);
-    const availabilityFactor = Math.min(minutesPlayed / 900, 1); // Cap at 10 full games
+    const gamesStarted = parseInt(player.starts || 0);
+    const gamesPlayed = Math.max(gamesStarted, 1);
+    const avgMinutesPerGame = minutesPlayed / gamesPlayed;
+    
+    // Calculate availability factor based on recent minutes
+    // Players playing 60+ minutes per game get full points (1.0)
+    // Players playing 45-60 minutes get reduced points (0.75)
+    // Players playing 30-45 minutes get significantly reduced (0.5)
+    // Players playing < 30 minutes are high rotation risk (0.3)
+    let availabilityFactor;
+    if (avgMinutesPerGame >= 60) {
+        availabilityFactor = 1.0; // Regular starter
+    } else if (avgMinutesPerGame >= 45) {
+        availabilityFactor = 0.75; // Frequent starter or reliable sub
+    } else if (avgMinutesPerGame >= 30) {
+        availabilityFactor = 0.5; // Rotation player
+    } else if (avgMinutesPerGame > 0) {
+        availabilityFactor = 0.3; // High rotation risk
+    } else {
+        availabilityFactor = 0.1; // Rarely plays
+    }
+    
+    // Adjust for chance of playing next round
+    const chanceOfPlaying = parseInt(player.chance_of_playing_next_round || 100);
+    if (chanceOfPlaying < 100) {
+        availabilityFactor *= (chanceOfPlaying / 100);
+    }
     
     // If no data at all, use basic calculation
     if (form === 0 && pointsPerGame === 0 && ictIndex === 0) {
@@ -277,28 +347,31 @@ async function analyzeTeam() {
     
     try {
         console.log('Fetching team data...');
-        const [teamData, bootstrapData] = await Promise.all([
+        const [teamData, bootstrapData, fixturesResponse] = await Promise.all([
             fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/`),
-            fetchWithProxy(`${API_BASE}/bootstrap-static/`)
+            fetchWithProxy(`${API_BASE}/bootstrap-static/`),
+            fetchWithProxy(`${API_BASE}/fixtures/`)
         ]);
         
         console.log('Fetching current team picks...');
         const currentEvent = bootstrapData.events.find(e => e.is_current)?.id || 1;
         const picksData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/event/${currentEvent}/picks/`);
         
+        console.log('Fixtures loaded:', fixturesResponse?.length || 0);
+        
         console.log('Calculating Expected Points with AI algorithm...');
         // Allow additional time for xP calculations (especially xCS for defenders/goalkeepers)
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         console.log('Processing data...');
-        displayAnalysis(teamData, bootstrapData, picksData);
+        displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse);
     } catch (error) {
         console.error('Error:', error);
         showError('Failed to load team data. Please try again.');
     }
 }
 
-function displayAnalysis(teamData, bootstrapData, picksData) {
+function displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse) {
     document.getElementById('teamName').textContent = teamData.name;
     
     const budget = teamData.last_deadline_bank / 10;
@@ -328,36 +401,9 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
     const teamsById = {};
     bootstrapData.teams.forEach(t => teamsById[t.id] = t);
     
-    // Create fixtures list from API data
-    const fixtures = [];
-    const currentEvent = bootstrapData.events.find(e => e.is_current)?.id || 1;
-    
-    // Get fixtures from bootstrap data
-    if (bootstrapData.fixtures) {
-        bootstrapData.fixtures.forEach(fixture => {
-            if (fixture.event >= currentEvent) {
-                // Home team
-                fixtures.push({
-                    event: fixture.event,
-                    team: fixture.team_h,
-                    difficulty: fixture.team_h_difficulty,
-                    finished: fixture.finished || false
-                });
-                // Away team
-                fixtures.push({
-                    event: fixture.event,
-                    team: fixture.team_a,
-                    difficulty: fixture.team_a_difficulty,
-                    finished: fixture.finished || false
-                });
-            }
-        });
-    }
-    
-    console.log('Fixtures loaded:', fixtures.length);
-    
     // Store fixtures globally for player comparison
-    fixturesData = fixtures;
+    fixturesData = fixturesResponse || [];
+    console.log('Fixtures stored globally:', fixturesData.length);
     
     // Populate player comparison selects
     populatePlayerSelects(bootstrapData.elements, teamsById);
@@ -367,13 +413,13 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
         const player = playersById[pick.element];
         if (player) {
             player.pickData = pick;
-            player.expectedPoints = calculateExpectedPoints(player, fixtures);
+            player.expectedPoints = calculateExpectedPoints(player, fixturesData);
             squadByPosition[player.element_type].push(player);
         }
     });
     
     // AI Transfer Suggestions
-    const suggestions = analyzeTransfers(picksData.picks, bootstrapData.elements, fixtures, budget);
+    const suggestions = analyzeTransfers(picksData.picks, bootstrapData.elements, fixturesData, budget);
     const transferSuggestions = document.getElementById('transferSuggestions');
     
     if (suggestions.length === 0) {
@@ -384,7 +430,11 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
             </div>
         `;
     } else {
-        transferSuggestions.innerHTML = suggestions.map((sug, idx) => `
+        transferSuggestions.innerHTML = suggestions.map((sug, idx) => {
+            const fixturesOut = getNextFixtures(sug.playerOut, fixturesData, teamsById, 5);
+            const fixturesIn = getNextFixtures(sug.playerIn, fixturesData, teamsById, 5);
+            
+            return `
             <div class="transfer-suggestion">
                 <div class="transfer-header">
                     <span class="ai-badge">AI Suggestion #${idx + 1}</span>
@@ -392,6 +442,28 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
                     <span class="transfer-arrow">→</span>
                     <span>${sug.playerIn.web_name} <span style="font-size: 0.9em; opacity: 0.8;">(${teamsById[sug.playerIn.team].short_name})</span></span>
                     <span class="position-badge">${getPositionName(sug.playerIn.element_type)}</span>
+                </div>
+                <div class="fixtures-comparison">
+                    <div class="fixtures-column">
+                        <h5>🔴 Out: Next 5 Fixtures</h5>
+                        <div class="fixtures-list">
+                            ${fixturesOut.length > 0 ? fixturesOut.map(f => `
+                                <span class="fixture-item ${f.difficultyClass}">
+                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                </span>
+                            `).join('') : '<span class="no-fixtures">No fixtures</span>'}
+                        </div>
+                    </div>
+                    <div class="fixtures-column">
+                        <h5>🟢 In: Next 5 Fixtures</h5>
+                        <div class="fixtures-list">
+                            ${fixturesIn.length > 0 ? fixturesIn.map(f => `
+                                <span class="fixture-item ${f.difficultyClass}">
+                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                </span>
+                            `).join('') : '<span class="no-fixtures">No fixtures</span>'}
+                        </div>
+                    </div>
                 </div>
                 <div class="player-stats">
                     <div class="stat-item">
@@ -411,7 +483,8 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
                     ${sug.reason}
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
     
     // Top Players
@@ -419,7 +492,7 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
     [1, 2, 3, 4].forEach(pos => {
         topPlayersByPosition[pos] = bootstrapData.elements
             .filter(p => p.element_type === pos && p.chance_of_playing_next_round !== 0)
-            .sort((a, b) => calculateExpectedPoints(b, fixtures) - calculateExpectedPoints(a, fixtures))
+            .sort((a, b) => calculateExpectedPoints(b, fixturesData) - calculateExpectedPoints(a, fixturesData))
             .slice(0, 5);
     });
     
@@ -437,7 +510,7 @@ function displayAnalysis(teamData, bootstrapData, picksData) {
                 </div>
                 <div class="players-grid">
                     ${players.map(p => {
-                        const xP = calculateExpectedPoints(p, fixtures);
+                        const xP = calculateExpectedPoints(p, fixturesData);
                         return `
                             <div class="player-card">
                                 <div class="player-info">
@@ -510,6 +583,7 @@ let allPlayersData = [];
 let fixturesData = [];
 let teamsData = {};
 let allPlayerOptions = [];
+let comparisonChart = null;
 
 function populatePlayerSelects(players, teams) {
     allPlayersData = players;
@@ -540,58 +614,73 @@ function populatePlayerSelects(players, teams) {
         return {
             id: player.id,
             position: positions[player.element_type],
+            positionType: player.element_type,
             text: `${player.web_name} (${team.short_name}) - £${(player.now_cost / 10).toFixed(1)}m`,
             searchText: `${player.web_name} ${team.short_name} ${team.name} ${positions[player.element_type]}`.toLowerCase()
         };
     });
     
-    renderPlayerOptions(player1Select, allPlayerOptions);
-    renderPlayerOptions(player2Select, allPlayerOptions);
+    // Initialize with MID position (default checked)
+    updatePlayerListsByPosition();
 }
 
 function renderPlayerOptions(selectElement, options) {
-    const positions = {};
-    
-    options.forEach(opt => {
-        if (!positions[opt.position]) {
-            positions[opt.position] = [];
-        }
-        positions[opt.position].push(opt);
-    });
-    
     let html = '<option value="">Select player...</option>';
     
-    ['GKP', 'DEF', 'MID', 'FWD'].forEach(pos => {
-        if (positions[pos] && positions[pos].length > 0) {
-            html += `<optgroup label="${pos}">`;
-            positions[pos].forEach(opt => {
-                html += `<option value="${opt.id}">${opt.text}</option>`;
-            });
-            html += '</optgroup>';
-        }
+    options.forEach(opt => {
+        html += `<option value="${opt.id}">${opt.text}</option>`;
     });
     
     selectElement.innerHTML = html;
+}
+
+function updatePlayerListsByPosition() {
+    const selectedPosition = document.querySelector('input[name="position"]:checked')?.value;
+    if (!selectedPosition) return;
+    
+    const player1Select = document.getElementById('player1Select');
+    const player2Select = document.getElementById('player2Select');
+    const player1Search = document.getElementById('player1Search');
+    const player2Search = document.getElementById('player2Search');
+    
+    // Clear search inputs
+    player1Search.value = '';
+    player2Search.value = '';
+    
+    // Filter players by selected position
+    const filteredOptions = allPlayerOptions.filter(opt => 
+        opt.positionType == selectedPosition
+    );
+    
+    // Sort by name
+    filteredOptions.sort((a, b) => a.text.localeCompare(b.text));
+    
+    renderPlayerOptions(player1Select, filteredOptions);
+    renderPlayerOptions(player2Select, filteredOptions);
 }
 
 function filterPlayerSelect(playerNum) {
     const searchInput = document.getElementById(`player${playerNum}Search`);
     const selectElement = document.getElementById(`player${playerNum}Select`);
     const searchTerm = searchInput.value.toLowerCase().trim();
+    const selectedPosition = document.querySelector('input[name="position"]:checked')?.value;
     
-    if (!searchTerm) {
-        renderPlayerOptions(selectElement, allPlayerOptions);
-        return;
-    }
-    
-    const filteredOptions = allPlayerOptions.filter(opt => 
-        opt.searchText.includes(searchTerm)
+    // First filter by position
+    let filteredOptions = allPlayerOptions.filter(opt => 
+        opt.positionType == selectedPosition
     );
+    
+    // Then filter by search term if provided
+    if (searchTerm) {
+        filteredOptions = filteredOptions.filter(opt => 
+            opt.searchText.includes(searchTerm)
+        );
+    }
     
     renderPlayerOptions(selectElement, filteredOptions);
 }
 
-function comparePlayersXP() {
+async function comparePlayersXP() {
     const player1Id = parseInt(document.getElementById('player1Select').value);
     const player2Id = parseInt(document.getElementById('player2Select').value);
     const resultDiv = document.getElementById('comparisonResult');
@@ -630,9 +719,20 @@ function comparePlayersXP() {
         return;
     }
     
+    // Show loading state
+    resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading player history...</p></div>';
+    
+    // Fetch player histories
+    const [history1, history2] = await Promise.all([
+        fetchPlayerHistory(player1Id),
+        fetchPlayerHistory(player2Id)
+    ]);
+    
     // Calculate xP for both players with selected gameweeks
     player1.expectedPoints = calculateExpectedPoints(player1, fixturesData, selectedGameweeks);
     player2.expectedPoints = calculateExpectedPoints(player2, fixturesData, selectedGameweeks);
+    player1.history = history1;
+    player2.history = history2;
     
     const xpDiff = Math.abs(player1.expectedPoints - player2.expectedPoints);
     const winner = player1.expectedPoints > player2.expectedPoints ? player1 : player2;
@@ -641,6 +741,9 @@ function comparePlayersXP() {
     const priceDiff = Math.abs(player1.now_cost - player2.now_cost) / 10;
     const value1 = player1.expectedPoints / (player1.now_cost / 10);
     const value2 = player2.expectedPoints / (player2.now_cost / 10);
+    
+    // Show chart
+    createComparisonChart(player1, player2, selectedGameweeks);
     
     resultDiv.innerHTML = `
         <div class="comparison-grid">
@@ -700,6 +803,35 @@ function comparePlayersXP() {
                         <span class="stat-value">${player1.minutes}</span>
                     </div>
                 </div>
+                ${history1.length > 0 ? `
+                <div class="recent-history">
+                    <h4>📜 Last 5 Matches</h4>
+                    <div class="history-list">
+                        ${history1.map((game, idx) => `
+                            <div class="history-item">
+                                <span class="history-gw">GW${game.round}</span>
+                                <span class="history-opponent">${game.was_home ? 'vs' : '@'} ${teamsData[game.opponent_team]?.short_name || 'TBA'}</span>
+                                <span class="history-points ${game.total_points >= 6 ? 'good' : game.total_points >= 3 ? 'ok' : 'bad'}">${game.total_points} pts</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                ${(() => {
+                    const fixtures1 = getNextFixtures(player1, fixturesData, teamsData, selectedGameweeks);
+                    return fixtures1.length > 0 ? `
+                    <div class="upcoming-fixtures">
+                        <h4>🔮 Next ${selectedGameweeks} Fixture${selectedGameweeks > 1 ? 's' : ''}</h4>
+                        <div class="fixtures-list">
+                            ${fixtures1.map(f => `
+                                <span class="fixture-item ${f.difficultyClass}">
+                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : '';
+                })()}
             </div>
             
             <div class="vs-column">
@@ -765,6 +897,35 @@ function comparePlayersXP() {
                         <span class="stat-value">${player2.minutes}</span>
                     </div>
                 </div>
+                ${history2.length > 0 ? `
+                <div class="recent-history">
+                    <h4>📜 Last 5 Matches</h4>
+                    <div class="history-list">
+                        ${history2.map((game, idx) => `
+                            <div class="history-item">
+                                <span class="history-gw">GW${game.round}</span>
+                                <span class="history-opponent">${game.was_home ? 'vs' : '@'} ${teamsData[game.opponent_team]?.short_name || 'TBA'}</span>
+                                <span class="history-points ${game.total_points >= 6 ? 'good' : game.total_points >= 3 ? 'ok' : 'bad'}">${game.total_points} pts</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                ${(() => {
+                    const fixtures2 = getNextFixtures(player2, fixturesData, teamsData, selectedGameweeks);
+                    return fixtures2.length > 0 ? `
+                    <div class="upcoming-fixtures">
+                        <h4>🔮 Next ${selectedGameweeks} Fixture${selectedGameweeks > 1 ? 's' : ''}</h4>
+                        <div class="fixtures-list">
+                            ${fixtures2.map(f => `
+                                <span class="fixture-item ${f.difficultyClass}">
+                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : '';
+                })()}
             </div>
         </div>
         
@@ -785,4 +946,231 @@ function comparePlayersXP() {
             </div>
         </div>
     `;
+}
+function createComparisonChart(player1, player2, gameweeks) {
+    const chartContainer = document.getElementById('comparisonChart');
+    chartContainer.style.display = 'block';
+    
+    const ctx = document.getElementById('playerComparisonCanvas');
+    
+    // Destroy existing chart if it exists
+    if (comparisonChart) {
+        comparisonChart.destroy();
+    }
+    
+    const value1 = player1.expectedPoints / (player1.now_cost / 10);
+    const value2 = player2.expectedPoints / (player2.now_cost / 10);
+    
+    const labels = [
+        'xP (Expected Points)',
+        'Form',
+        'Points/Game',
+        'Value (xP/£m)',
+        'Total Points',
+        'Selected By %'
+    ];
+    
+    const data1 = [
+        player1.expectedPoints,
+        parseFloat(player1.form) || 0,
+        parseFloat(player1.points_per_game) || 0,
+        value1,
+        player1.total_points / 10, // Scale down for better visualization
+        parseFloat(player1.selected_by_percent) || 0
+    ];
+    
+    const data2 = [
+        player2.expectedPoints,
+        parseFloat(player2.form) || 0,
+        parseFloat(player2.points_per_game) || 0,
+        value2,
+        player2.total_points / 10, // Scale down for better visualization
+        parseFloat(player2.selected_by_percent) || 0
+    ];
+    
+    comparisonChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: player1.web_name,
+                    data: data1,
+                    backgroundColor: 'rgba(0, 204, 106, 0.7)',
+                    borderColor: 'rgba(0, 204, 106, 1)',
+                    borderWidth: 2
+                },
+                {
+                    label: player2.web_name,
+                    data: data2,
+                    backgroundColor: 'rgba(4, 245, 255, 0.7)',
+                    borderColor: 'rgba(4, 245, 255, 1)',
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        padding: 15,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const value = context.parsed.y;
+                            // Format based on metric
+                            if (context.label.includes('Total Points')) {
+                                label += (value * 10).toFixed(0); // Scale back up
+                            } else if (context.label.includes('Value')) {
+                                label += value.toFixed(2);
+                            } else {
+                                label += value.toFixed(1);
+                            }
+                            return label;
+                        }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: false,
+                        mode: 'xy',
+                        modifierKey: null
+                    },
+                    zoom: {
+                        wheel: {
+                            enabled: false,
+                            speed: 0.1
+                        },
+                        pinch: {
+                            enabled: false
+                        },
+                        mode: 'xy'
+                    },
+                    limits: {
+                        x: {min: 'original', max: 'original'},
+                        y: {min: 'original', max: 'original'}
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: {
+                            size: 12
+                        },
+                        callback: function(value) {
+                            return value.toFixed(1);
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 11,
+                            weight: 'bold'
+                        },
+                        autoSkip: false,
+                        maxRotation: 45,
+                        minRotation: 0
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+    
+    // Scroll to chart
+    chartContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetChartZoom() {
+    if (comparisonChart) {
+        comparisonChart.resetZoom();
+    }
+}
+
+function toggleFullscreen(elementId) {
+    const element = document.getElementById(elementId);
+    
+    if (!document.fullscreenElement) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+        element.classList.add('fullscreen-mode');
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        element.classList.remove('fullscreen-mode');
+    }
+}
+
+// Listen for fullscreen changes
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+        const chartContainer = document.getElementById('comparisonChart');
+        if (chartContainer) {
+            chartContainer.classList.remove('fullscreen-mode');
+        }
+    }
+    // Resize chart when exiting fullscreen
+    if (comparisonChart) {
+        setTimeout(() => comparisonChart.resize(), 100);
+    }
+});
+
+// Toggle methodology section
+function toggleMethodology() {
+    const content = document.getElementById('methodologyContent');
+    const icon = document.querySelector('.methodology .toggle-icon');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.classList.add('rotated');
+    } else {
+        content.style.display = 'none';
+        icon.classList.remove('rotated');
+    }
 }
