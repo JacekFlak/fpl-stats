@@ -1,24 +1,36 @@
 let TEAM_ID = 8668;
+let isLoading = false;
 const API_BASE = 'https://fantasy.premierleague.com/api';
 
 async function fetchWithProxy(url) {
     const proxies = [
-        '',
         'https://corsproxy.io/?',
         'https://api.codetabs.com/v1/proxy?quest=',
+        'https://api.allorigins.win/raw?url=',
     ];
 
     for (let i = 0; i < proxies.length; i++) {
         try {
+            // Add delay between proxy attempts
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
             const proxyUrl = proxies[i] ? `${proxies[i]}${encodeURIComponent(url)}` : url;
             console.log(`Attempt ${i + 1}: ${proxies[i] ? 'with proxy' : 'direct'}`);
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
             
             const response = await fetch(proxyUrl, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' },
                 mode: 'cors',
-                cache: 'no-cache'
+                cache: 'no-cache',
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
@@ -37,6 +49,36 @@ function getPositionName(type) {
     return positions[type] || 'Unknown';
 }
 
+// Helper function to organize fixtures by gameweek
+function getFixturesByGameweek(player, fixtures, numGameweeks) {
+    if (!fixtures || fixtures.length === 0) return [];
+    
+    // Get all upcoming fixtures for this player's team
+    const allTeamFixtures = fixtures
+        .filter(f => !f.finished && f.event && (f.team_h === player.team || f.team_a === player.team))
+        .sort((a, b) => a.event - b.event);
+    
+    if (allTeamFixtures.length === 0) return [];
+    
+    // Get the next N gameweeks
+    const firstGW = allTeamFixtures[0].event;
+    const gameweeks = [];
+    
+    for (let i = 0; i < numGameweeks; i++) {
+        const gw = firstGW + i;
+        const gwFixtures = allTeamFixtures.filter(f => f.event === gw);
+        
+        gameweeks.push({
+            gameweek: gw,
+            fixtures: gwFixtures,
+            isBlank: gwFixtures.length === 0,
+            isDouble: gwFixtures.length > 1
+        });
+    }
+    
+    return gameweeks;
+}
+
 function getNextFixtures(player, fixtures, teamsById, count = 5) {
     if (!fixtures || fixtures.length === 0) {
         console.warn('No fixtures data available');
@@ -45,25 +87,37 @@ function getNextFixtures(player, fixtures, teamsById, count = 5) {
     
     console.log(`Getting fixtures for player team ${player.team}, total fixtures: ${fixtures.length}`);
     
-    const playerFixtures = fixtures
-        .filter(f => !f.finished && (f.team_h === player.team || f.team_a === player.team))
-        .sort((a, b) => a.event - b.event)
-        .slice(0, count);
+    const fixturesByGW = getFixturesByGameweek(player, fixtures, count);
     
-    console.log(`Found ${playerFixtures.length} fixtures for team ${player.team}`);
+    console.log(`Found ${fixturesByGW.length} gameweeks for team ${player.team}`);
     
-    return playerFixtures.map(fixture => {
-        const isHome = fixture.team_h === player.team;
-        const opponentId = isHome ? fixture.team_a : fixture.team_h;
-        const opponent = teamsById[opponentId];
-        const difficulty = isHome ? fixture.team_h_difficulty : fixture.team_a_difficulty;
+    return fixturesByGW.flatMap(gw => {
+        if (gw.isBlank) {
+            return [{
+                opponent: 'BLANK',
+                isHome: false,
+                difficulty: 0,
+                difficultyClass: 'blank',
+                isBlank: true,
+                gameweek: gw.gameweek
+            }];
+        }
         
-        return {
-            opponent: opponent ? opponent.short_name : 'TBA',
-            isHome: isHome,
-            difficulty: difficulty,
-            difficultyClass: getFixtureDifficulty(difficulty)
-        };
+        return gw.fixtures.map(fixture => {
+            const isHome = fixture.team_h === player.team;
+            const opponentId = isHome ? fixture.team_a : fixture.team_h;
+            const opponent = teamsById[opponentId];
+            const difficulty = isHome ? fixture.team_h_difficulty : fixture.team_a_difficulty;
+            
+            return {
+                opponent: opponent ? opponent.short_name : 'TBA',
+                isHome: isHome,
+                difficulty: difficulty,
+                difficultyClass: getFixtureDifficulty(difficulty),
+                isDouble: gw.isDouble,
+                gameweek: gw.gameweek
+            };
+        });
     });
 }
 
@@ -137,15 +191,12 @@ function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
         return (player.total_points / Math.max(player.minutes / 90, 1) * numGameweeks) * availabilityFactor;
     }
     
-    // Get next N fixtures
-    const playerFixtures = fixtures
-        .filter(f => f.team === player.team && !f.finished)
-        .sort((a, b) => a.event - b.event)
-        .slice(0, numGameweeks);
+    // Get fixtures organized by gameweek (handles blank/double GWs)
+    const fixturesByGW = getFixturesByGameweek(player, fixtures, numGameweeks);
     
-    if (playerFixtures.length === 0) {
-        // No fixtures found, use weighted estimation with Opta data
-        const baseXP = (form * 0.3 + pointsPerGame * 0.3 + (ictIndex / 20) * 0.4);
+    if (fixturesByGW.length === 0) {
+        // No fixtures found, use weighted estimation with Opta data (reduced form weight)
+        const baseXP = (form * 0.15 + pointsPerGame * 0.35 + (ictIndex / 20) * 0.5);
         return baseXP * numGameweeks * availabilityFactor;
     }
     
@@ -164,63 +215,78 @@ function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
     const isGoalkeeper = player.element_type === 1; // GKP
     const cleanSheetsPerGame = player.clean_sheets / Math.max(player.starts || 1, 1);
     
-    playerFixtures.forEach(fixture => {
-        const difficulty = fixture.difficulty || 3;
-        
-        // Base points from multiple sources
-        const formComponent = form * 0.25;
-        const pointsPerGameComponent = pointsPerGame * 0.25;
-        const optaComponent = optaScore * 0.3;
-        const xGIComponent = expectedGoalInvolvements * 0.2; // xG involvements per game
-        
-        let basePoints = formComponent + pointsPerGameComponent + optaComponent + xGIComponent;
-        
-        // Clean Sheet Probability for DEF and GKP (xCS - Expected Clean Sheets)
-        if (isDefender || isGoalkeeper) {
-            let cleanSheetProbability = 0;
-            
-            // Calculate xCS based on fixture difficulty and team's defensive record
-            if (difficulty <= 2) {
-                // Easy fixture: high CS probability
-                cleanSheetProbability = 0.50 + (cleanSheetsPerGame * 0.3);
-            } else if (difficulty === 3) {
-                // Medium fixture: moderate CS probability
-                cleanSheetProbability = 0.30 + (cleanSheetsPerGame * 0.2);
-            } else {
-                // Hard fixture: low CS probability
-                cleanSheetProbability = 0.15 + (cleanSheetsPerGame * 0.1);
-            }
-            
-            // Cap probability between 0 and 0.80 (max 80% CS chance)
-            cleanSheetProbability = Math.min(Math.max(cleanSheetProbability, 0), 0.80);
-            
-            // Expected clean sheet points: 4 points for both GKP and DEF
-            const expectedCleanSheetPoints = cleanSheetProbability * 4;
-            
-            // For goalkeepers, add expected save points (3 saves = 1 point)
-            if (isGoalkeeper) {
-                const savesPerGame = player.saves / Math.max(player.starts || 1, 1);
-                const expectedSavePoints = (savesPerGame / 3); // 3 saves = 1 point
-                basePoints += expectedSavePoints;
-            }
-            
-            basePoints += expectedCleanSheetPoints;
+    // Process each gameweek (accounting for blank and double gameweeks)
+    fixturesByGW.forEach(gw => {
+        if (gw.isBlank) {
+            // Blank gameweek = 0 points
+            return;
         }
         
-        // Fixture difficulty multiplier (easier fixtures = more points expected)
-        const difficultyMultiplier = difficulty <= 2 ? 1.4 : difficulty <= 3 ? 1.0 : 0.65;
+        let gwPoints = 0;
         
-        // Home/away factor if available in fixture data
-        const venueMultiplier = 1.0; // Could be enhanced with home/away data
+        // Calculate points for each fixture in this gameweek
+        gw.fixtures.forEach(fixture => {
+            const isHome = fixture.team_h === player.team;
+            const difficulty = isHome ? fixture.team_h_difficulty : fixture.team_a_difficulty;
+            
+            // Base points from multiple sources
+            const formComponent = form * 0.1;
+            const pointsPerGameComponent = pointsPerGame * 0.25;
+            const optaComponent = optaScore * 0.4;
+            const xGIComponent = isGoalkeeper ? 0 : (expectedGoalInvolvements * 0.25); // xG involvements per game (outfield only)
+            
+            let basePoints = formComponent + pointsPerGameComponent + optaComponent + xGIComponent;
+            
+            // Clean Sheet Probability for DEF and GKP (xCS - Expected Clean Sheets)
+            if (isDefender || isGoalkeeper) {
+                let cleanSheetProbability = 0;
+                
+                // Calculate xCS based on fixture difficulty and team's defensive record
+                if (difficulty <= 2) {
+                    // Easy fixture: high CS probability
+                    cleanSheetProbability = 0.50 + (cleanSheetsPerGame * 0.3);
+                } else if (difficulty === 3) {
+                    // Medium fixture: moderate CS probability
+                    cleanSheetProbability = 0.30 + (cleanSheetsPerGame * 0.2);
+                } else {
+                    // Hard fixture: low CS probability
+                    cleanSheetProbability = 0.15 + (cleanSheetsPerGame * 0.1);
+                }
+                
+                // Cap probability between 0 and 0.80 (max 80% CS chance)
+                cleanSheetProbability = Math.min(Math.max(cleanSheetProbability, 0), 0.80);
+                
+                // Expected clean sheet points: 4 points for both GKP and DEF
+                const expectedCleanSheetPoints = cleanSheetProbability * 4;
+                
+                // For goalkeepers, add expected save points (3 saves = 1 point)
+                if (isGoalkeeper) {
+                    const savesPerGame = player.saves / Math.max(player.starts || 1, 1);
+                    const expectedSavePoints = (savesPerGame / 3); // 3 saves = 1 point
+                    basePoints += expectedSavePoints;
+                }
+                
+                basePoints += expectedCleanSheetPoints;
+            }
+            
+            // Fixture difficulty multiplier (easier fixtures = more points expected)
+            const difficultyMultiplier = difficulty <= 2 ? 1.4 : difficulty <= 3 ? 1.0 : 0.65;
+            
+            // Home/away factor if available in fixture data
+            const venueMultiplier = 1.0; // Could be enhanced with home/away data
+            
+            gwPoints += basePoints * difficultyMultiplier * venueMultiplier;
+        });
         
-        xP += basePoints * difficultyMultiplier * venueMultiplier * availabilityFactor;
+        // Apply double gameweek adjustment (rotation/fatigue factor)
+        if (gw.isDouble) {
+            // In double gameweeks, players don't score exactly 2x due to rotation and fatigue
+            // Apply 0.85 factor per game (so 2 games = 1.7x instead of 2.0x)
+            gwPoints *= 0.85;
+        }
+        
+        xP += gwPoints * availabilityFactor;
     });
-    
-    // If less than requested fixtures, extrapolate based on average
-    if (playerFixtures.length < numGameweeks && playerFixtures.length > 0) {
-        const avgPerFixture = xP / playerFixtures.length;
-        xP = avgPerFixture * numGameweeks;
-    }
     
     return xP;
 }
@@ -330,6 +396,12 @@ function generateTransferReason(playerOut, playerIn, costDiff) {
 }
 
 async function analyzeTeam() {
+    // Prevent multiple simultaneous loads
+    if (isLoading) {
+        console.log('Already loading, please wait...');
+        return;
+    }
+    
     const input = document.getElementById('teamIdInput');
     const newTeamId = parseInt(input.value);
     
@@ -338,6 +410,7 @@ async function analyzeTeam() {
         return;
     }
     
+    isLoading = true;
     TEAM_ID = newTeamId;
     
     document.getElementById('teamName').textContent = 'Analyzing...';
@@ -368,10 +441,15 @@ async function analyzeTeam() {
     } catch (error) {
         console.error('Error:', error);
         showError('Failed to load team data. Please try again.');
+    } finally {
+        isLoading = false;
     }
 }
 
 function displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse) {
+    console.log('Full entry_history:', picksData.entry_history);
+    console.log('Picks data keys:', Object.keys(picksData).filter(k => !k.includes('pick')));
+    
     document.getElementById('teamName').textContent = teamData.name;
     
     const budget = teamData.last_deadline_bank / 10;
@@ -387,10 +465,6 @@ function displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse) {
         <div class="stat-card">
             <div class="stat-label">Team Value</div>
             <div class="stat-value">£${teamValue.toFixed(1)}m</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Free Transfers</div>
-            <div class="stat-value">${picksData.entry_history.event_transfers || 1}</div>
         </div>
     `;
     
@@ -448,8 +522,8 @@ function displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse) {
                         <h5>🔴 Out: Next 5 Fixtures</h5>
                         <div class="fixtures-list">
                             ${fixturesOut.length > 0 ? fixturesOut.map(f => `
-                                <span class="fixture-item ${f.difficultyClass}">
-                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                <span class="fixture-item ${f.difficultyClass} ${f.isDouble ? 'double' : ''}" title="${f.isBlank ? 'Blank Gameweek' : f.isDouble ? 'Double Gameweek' : ''}">
+                                    ${f.isBlank ? 'BLANK' : `vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}${f.isDouble ? ' 🔥' : ''}`}
                                 </span>
                             `).join('') : '<span class="no-fixtures">No fixtures</span>'}
                         </div>
@@ -458,8 +532,8 @@ function displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse) {
                         <h5>🟢 In: Next 5 Fixtures</h5>
                         <div class="fixtures-list">
                             ${fixturesIn.length > 0 ? fixturesIn.map(f => `
-                                <span class="fixture-item ${f.difficultyClass}">
-                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                <span class="fixture-item ${f.difficultyClass} ${f.isDouble ? 'double' : ''}" title="${f.isBlank ? 'Blank Gameweek' : f.isDouble ? 'Double Gameweek' : ''}">
+                                    ${f.isBlank ? 'BLANK' : `vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}${f.isDouble ? ' 🔥' : ''}`}
                                 </span>
                             `).join('') : '<span class="no-fixtures">No fixtures</span>'}
                         </div>
@@ -487,66 +561,38 @@ function displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse) {
         }).join('');
     }
     
-    // Top Players
-    const topPlayersByPosition = {};
-    [1, 2, 3, 4].forEach(pos => {
-        topPlayersByPosition[pos] = bootstrapData.elements
-            .filter(p => p.element_type === pos && p.chance_of_playing_next_round !== 0)
-            .sort((a, b) => calculateExpectedPoints(b, fixturesData) - calculateExpectedPoints(a, fixturesData))
-            .slice(0, 5);
-    });
-    
-    const topPlayers = document.getElementById('topPlayers');
-    let topPlayersHTML = '';
-    
-    [1, 2, 3, 4].forEach(pos => {
-        const posName = getPositionName(pos);
-        const players = topPlayersByPosition[pos];
-        
-        topPlayersHTML += `
-            <div class="position-section">
-                <div class="position-title">
-                    <span>${posName}</span>
-                </div>
-                <div class="players-grid">
-                    ${players.map(p => {
-                        const xP = calculateExpectedPoints(p, fixturesData);
-                        return `
-                            <div class="player-card">
-                                <div class="player-info">
-                                    <div class="player-name">${p.web_name}</div>
-                                    <div class="player-team">${teamsById[p.team].name}</div>
-                                </div>
-                                <div class="player-stats">
-                                    <div class="stat-item">
-                                        <span class="stat-label">Price</span>
-                                        <span class="stat-value">£${(p.now_cost / 10).toFixed(1)}m</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">Form</span>
-                                        <span class="stat-value good">${p.form}</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">xP (5GW)</span>
-                                        <span class="stat-value good">${xP.toFixed(1)}</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">Selected</span>
-                                        <span class="stat-value">${p.selected_by_percent}%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    });
-    
-    topPlayers.innerHTML = topPlayersHTML;
+
     
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
+}
+
+function switchTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(tab => {
+        tab.classList.remove('active');
+    });
+
+    // Remove active class from all buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Show selected tab
+    const selectedTab = document.getElementById(`tab-${tabName}`);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+
+    // Mark button as active
+    event.target.classList.add('active');
+
+    // Resize chart if comparing players
+    if (tabName === 'compare' && comparisonChart) {
+        setTimeout(() => comparisonChart.resize(), 100);
+    }
 }
 
 function showError(message) {
@@ -615,13 +661,30 @@ function populatePlayerSelects(players, teams) {
             id: player.id,
             position: positions[player.element_type],
             positionType: player.element_type,
+            teamId: player.team,
+            teamName: team.name,
             text: `${player.web_name} (${team.short_name}) - £${(player.now_cost / 10).toFixed(1)}m`,
             searchText: `${player.web_name} ${team.short_name} ${team.name} ${positions[player.element_type]}`.toLowerCase()
         };
     });
-    
-    // Initialize with MID position (default checked)
-    updatePlayerListsByPosition();
+
+    populateTeamFilterOptions(teams);
+
+    // Initialize with MID position (default selected)
+    updatePlayerListsByFilters();
+}
+
+function populateTeamFilterOptions(teams) {
+    const teamOptions = Object.values(teams)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(team => `<option value="${team.id}">${team.name}</option>`)
+        .join('');
+
+    ['player1TeamFilter', 'player2TeamFilter'].forEach(filterId => {
+        const teamFilter = document.getElementById(filterId);
+        if (!teamFilter) return;
+        teamFilter.innerHTML = `<option value="all">All teams</option>${teamOptions}`;
+    });
 }
 
 function renderPlayerOptions(selectElement, options) {
@@ -634,41 +697,52 @@ function renderPlayerOptions(selectElement, options) {
     selectElement.innerHTML = html;
 }
 
-function updatePlayerListsByPosition() {
-    const selectedPosition = document.querySelector('input[name="position"]:checked')?.value;
+function updatePlayerListsByFilters() {
+    updatePlayerListForPlayer(1);
+    updatePlayerListForPlayer(2);
+}
+
+function updatePlayerListForPlayer(playerNum) {
+    const positionFilter = document.getElementById('positionFilter');
+    const selectedPosition = positionFilter ? positionFilter.value : null;
     if (!selectedPosition) return;
-    
-    const player1Select = document.getElementById('player1Select');
-    const player2Select = document.getElementById('player2Select');
-    const player1Search = document.getElementById('player1Search');
-    const player2Search = document.getElementById('player2Search');
-    
-    // Clear search inputs
-    player1Search.value = '';
-    player2Search.value = '';
-    
-    // Filter players by selected position
-    const filteredOptions = allPlayerOptions.filter(opt => 
-        opt.positionType == selectedPosition
-    );
-    
-    // Sort by name
+
+    const selectElement = document.getElementById(`player${playerNum}Select`);
+    const searchInput = document.getElementById(`player${playerNum}Search`);
+    const teamFilter = document.getElementById(`player${playerNum}TeamFilter`);
+    const selectedTeam = teamFilter ? teamFilter.value : 'all';
+
+    if (searchInput) {
+        searchInput.value = '';
+    }
+
+    const filteredOptions = allPlayerOptions.filter(opt => {
+        const positionMatch = opt.positionType == selectedPosition;
+        const teamMatch = selectedTeam === 'all' || String(opt.teamId) === String(selectedTeam);
+        return positionMatch && teamMatch;
+    });
+
     filteredOptions.sort((a, b) => a.text.localeCompare(b.text));
-    
-    renderPlayerOptions(player1Select, filteredOptions);
-    renderPlayerOptions(player2Select, filteredOptions);
+
+    if (selectElement) {
+        renderPlayerOptions(selectElement, filteredOptions);
+    }
 }
 
 function filterPlayerSelect(playerNum) {
     const searchInput = document.getElementById(`player${playerNum}Search`);
     const selectElement = document.getElementById(`player${playerNum}Select`);
     const searchTerm = searchInput.value.toLowerCase().trim();
-    const selectedPosition = document.querySelector('input[name="position"]:checked')?.value;
+    const selectedPosition = document.getElementById('positionFilter')?.value;
+    const selectedTeam = document.getElementById(`player${playerNum}TeamFilter`)?.value || 'all';
+    if (!selectedPosition) return;
     
-    // First filter by position
-    let filteredOptions = allPlayerOptions.filter(opt => 
-        opt.positionType == selectedPosition
-    );
+    // First filter by position and team
+    let filteredOptions = allPlayerOptions.filter(opt => {
+        const positionMatch = opt.positionType == selectedPosition;
+        const teamMatch = selectedTeam === 'all' || String(opt.teamId) === String(selectedTeam);
+        return positionMatch && teamMatch;
+    });
     
     // Then filter by search term if provided
     if (searchTerm) {
@@ -824,8 +898,8 @@ async function comparePlayersXP() {
                         <h4>🔮 Next ${selectedGameweeks} Fixture${selectedGameweeks > 1 ? 's' : ''}</h4>
                         <div class="fixtures-list">
                             ${fixtures1.map(f => `
-                                <span class="fixture-item ${f.difficultyClass}">
-                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                <span class="fixture-item ${f.difficultyClass} ${f.isDouble ? 'double' : ''}" title="${f.isBlank ? 'Blank Gameweek' : f.isDouble ? 'Double Gameweek' : ''}">
+                                    ${f.isBlank ? 'BLANK' : `vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}${f.isDouble ? ' 🔥' : ''}`}
                                 </span>
                             `).join('')}
                         </div>
@@ -918,8 +992,8 @@ async function comparePlayersXP() {
                         <h4>🔮 Next ${selectedGameweeks} Fixture${selectedGameweeks > 1 ? 's' : ''}</h4>
                         <div class="fixtures-list">
                             ${fixtures2.map(f => `
-                                <span class="fixture-item ${f.difficultyClass}">
-                                    vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}
+                                <span class="fixture-item ${f.difficultyClass} ${f.isDouble ? 'double' : ''}" title="${f.isBlank ? 'Blank Gameweek' : f.isDouble ? 'Double Gameweek' : ''}">
+                                    ${f.isBlank ? 'BLANK' : `vs ${f.opponent} ${f.isHome ? '(H)' : '(A)'}${f.isDouble ? ' 🔥' : ''}`}
                                 </span>
                             `).join('')}
                         </div>
