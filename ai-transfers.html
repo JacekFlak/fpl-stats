@@ -14,14 +14,23 @@
 <body>
     <div class="container">
         <header>
-            <h1>🤖 AI Transfers Suggestions</h1>
+            <h1>🤖 AI Team</h1>
             <nav class="nav-links">
-                <a href="index.html">← Back to Stats</a>
+                <a href="index.html" style="color: #00ff87; text-decoration: none; font-size: 1.1em; font-weight: bold;">← Back to Stats</a>
             </nav>
             <div class="search-container">
                 <label for="teamIdInput">Team ID:</label>
                 <input type="number" id="teamIdInput" value="8668" placeholder="Enter Team ID" min="1">
                 <button onclick="analyzeTeam()">Analyze Team</button>
+            </div>
+            <div class="friends-buttons">
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 8668; analyzeTeam();">JF</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 3662629; analyzeTeam();">MS</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 8385816; analyzeTeam();">MK</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 2684590; analyzeTeam();">RL</button>
+            </div>
+            <div class="section-buttons">
+                <a href="players-comparison.html" class="section-btn" style="color: #04f5ff; text-decoration: none;">⚖️ Compare Players</a>
             </div>
             <div class="team-name" id="teamName"></div>
         </header>
@@ -34,64 +43,84 @@
         <div id="error" class="error" style="display: none;"></div>
 
         <div id="content" style="display: none;">
-            <!-- Team Budget Info -->
-            <div class="stats-grid" id="budgetInfo"></div>
+            <!-- TAB 1: RECOMMENDATIONS -->
+            <div id="tab-recommendations" class="tab-content active">
+                <div class="section-buttons" style="margin-bottom: 25px;">
+                    <a href="players-comparison.html" class="section-btn" style="color: #04f5ff; text-decoration: none;">⚖️ Compare Players</a>
+                    <a href="ai-team.html" class="section-btn" style="color: #00ff87; text-decoration: none;">🚀 AI Team</a>
+                </div>
+                <!-- Team Budget Info -->
+                <div class="stats-grid" id="budgetInfo"></div>
 
-            <!-- AI Transfer Suggestions -->
-            <div class="section ai-suggestions">
+                <!-- AI Transfer Suggestions -->
+                <div class="section ai-suggestions">
                 <h2>🎯 AI Transfer Recommendations</h2>
                 <div id="transferSuggestions"></div>
             </div>
 
-            <!-- FDR Legend -->
-            <div class="fdr-legend">
-                <h4>📊 Fixture Difficulty Rating (FDR) Legend</h4>
-                <div class="fdr-legend-items">
-                    <div class="fdr-legend-item">
-                        <span class="fdr-box very-easy">1</span>
-                        <span>Very Easy</span>
+                <!-- FDR Legend -->
+                <div class="fdr-legend">
+                    <h4>📊 Fixture Difficulty Rating (FDR) Legend</h4>
+                    <div class="fdr-legend-items">
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box very-easy">1</span>
+                            <span>Very Easy</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box easy">2</span>
+                            <span>Easy</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box medium">3</span>
+                            <span>Medium</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box hard">4</span>
+                            <span>Hard</span>
+                        </div>
+                        <div class="fdr-legend-item">
+                            <span class="fdr-box very-hard">5</span>
+                            <span>Very Hard</span>
+                        </div>
                     </div>
-                    <div class="fdr-legend-item">
-                        <span class="fdr-box easy">2</span>
-                        <span>Easy</span>
-                    </div>
-                    <div class="fdr-legend-item">
-                        <span class="fdr-box medium">3</span>
-                        <span>Medium</span>
-                    </div>
-                    <div class="fdr-legend-item">
-                        <span class="fdr-box hard">4</span>
-                        <span>Hard</span>
-                    </div>
-                    <div class="fdr-legend-item">
-                        <span class="fdr-box very-hard">5</span>
-                        <span>Very Hard</span>
+                </div>
+
+                <!-- xP Methodology -->
+                <div class="section methodology">
+                    <h2 class="collapsible-header" onclick="toggleMethodology()">
+                        📊 How Expected Points (xP) are Calculated
+                        <span class="toggle-icon">▼</span>
+                    </h2>
+                    <div class="methodology-content" id="methodologyContent" style="display: none;">
+                        <p class="intro">Our AI uses an advanced algorithm powered by <strong>Opta professional statistics</strong> to predict player performance over the next 5 gameweeks.</p>
+                        
+                        <div class="formula-box">
+                            <h3>Main Formula</h3>
+                            <div class="formula">
+                                xP = (0.1×Form + 0.25×PPG + 0.4×Opta + 0.25×xGI) × Difficulty × Availability × 5
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Player Comparison -->
-            <div class="section player-comparison">
-                <h2>⚖️ Compare Two Players (xP)</h2>
-                <div class="position-selector">
-                    <label>Select Position:</label>
-                    <div class="position-options">
-                        <label class="position-option">
-                            <input type="radio" name="position" value="1" onchange="updatePlayerListsByPosition()">
-                            <span>🧤 GKP</span>
-                        </label>
-                        <label class="position-option">
-                            <input type="radio" name="position" value="2" onchange="updatePlayerListsByPosition()">
-                            <span>🛡️ DEF</span>
-                        </label>
-                        <label class="position-option">
-                            <input type="radio" name="position" value="3" checked onchange="updatePlayerListsByPosition()">
-                            <span>⚽ MID</span>
-                        </label>
-                        <label class="position-option">
-                            <input type="radio" name="position" value="4" onchange="updatePlayerListsByPosition()">
-                            <span>🎯 FWD</span>
-                        </label>
+            <!-- TAB 2: COMPARE PLAYERS -->
+            <div id="tab-compare" class="tab-content">
+                <div class="section-buttons" style="margin-bottom: 25px;">
+                    <a href="players-comparison.html" class="section-btn" style="color: #04f5ff; text-decoration: none;">⚖️ Compare Players</a>
+                    <a href="ai-team.html" class="section-btn" style="color: #00ff87; text-decoration: none;">🚀 AI Team</a>
+                </div>
+                <div class="section player-comparison">
+                    <h2>⚖️ Compare Two Players (xP)</h2>
+                <div class="comparison-filters">
+                    <div class="filter-group">
+                        <label for="positionFilter">Position:</label>
+                        <select id="positionFilter" class="filter-select" onchange="updatePlayerListsByFilters()">
+                            <option value="1">🧤 GKP</option>
+                            <option value="2">🛡️ DEF</option>
+                            <option value="3" selected>⚽ MID</option>
+                            <option value="4">🎯 FWD</option>
+                        </select>
                     </div>
                 </div>
                 <div class="gameweeks-selector">
@@ -114,6 +143,9 @@
                 <div class="comparison-controls">
                     <div class="player-select-group">
                         <label for="player1Select">Player 1:</label>
+                        <select id="player1TeamFilter" class="player-team-filter" onchange="updatePlayerListsByFilters()">
+                            <option value="all">All teams</option>
+                        </select>
                         <input type="text" id="player1Search" class="player-search" placeholder="🔍 Search player..." oninput="filterPlayerSelect(1)">
                         <select id="player1Select" class="player-select" size="8">
                             <option value="">Select player...</option>
@@ -122,6 +154,9 @@
                     <div class="vs-divider">VS</div>
                     <div class="player-select-group">
                         <label for="player2Select">Player 2:</label>
+                        <select id="player2TeamFilter" class="player-team-filter" onchange="updatePlayerListsByFilters()">
+                            <option value="all">All teams</option>
+                        </select>
                         <input type="text" id="player2Search" class="player-search" placeholder="🔍 Search player..." oninput="filterPlayerSelect(2)">
                         <select id="player2Select" class="player-select" size="8">
                             <option value="">Select player...</option>
@@ -166,33 +201,30 @@
                         </div>
                     </div>
                 </div>
+                </div>
             </div>
 
-            <!-- Players to Consider -->
-            <div class="section">
-                <h2>Top Players by Expected Points (Next 5 GWs)</h2>
-                <div id="topPlayers"></div>
-            </div>
-
-            <!-- xP Methodology -->
-            <div class="section methodology">
-                <h2 class="collapsible-header" onclick="toggleMethodology()">
-                    📊 How Expected Points (xP) are Calculated
-                    <span class="toggle-icon">▼</span>
-                </h2>
-                <div class="methodology-content" id="methodologyContent" style="display: none;">
+            <!-- TAB 3: ANALYSIS -->
+            <div id="tab-analysis" class="tab-content">
+                <div class="section-buttons" style="margin-bottom: 25px;">
+                    <a href="players-comparison.html" class="section-btn" style="color: #04f5ff; text-decoration: none;">⚖️ Compare Players</a>
+                    <a href="ai-team.html" class="section-btn" style="color: #00ff87; text-decoration: none;">🚀 AI Team</a>
+                </div>
+                <div class="section methodology">
+                    <h2>📊 Detailed Analysis</h2>
+                    <div class="methodology-content" id="analysisContent" style="display: block;">
                     <p class="intro">Our AI uses an advanced algorithm powered by <strong>Opta professional statistics</strong> to predict player performance over the next 5 gameweeks.</p>
                     
                     <div class="formula-box">
                         <h3>Main Formula</h3>
                         <div class="formula">
-                            xP = (Form + PPG + Opta + xGI) × Difficulty × Availability × 5
+                            xP = (0.1×Form + 0.25×PPG + 0.4×Opta + 0.25×xGI) × Difficulty × Availability × 5
                         </div>
                     </div>
 
                     <div class="components-grid">
                         <div class="component">
-                            <h4>🔥 Form Component (25%)</h4>
+                            <h4>🔥 Form Component (10%)</h4>
                             <p>Recent performance trend from last gameweeks</p>
                             <div class="formula-small">Form Score from FPL API</div>
                         </div>
@@ -204,7 +236,7 @@
                         </div>
 
                         <div class="component highlight">
-                            <h4>⚽ Opta Component (30%)</h4>
+                            <h4>⚽ Opta Component (40%)</h4>
                             <p><strong>Professional statistics</strong> from official Premier League data provider:</p>
                             <ul>
                                 <li><strong>Expected Goals (xG)</strong> × 5 - Shot quality analysis</li>
@@ -217,8 +249,8 @@
                         </div>
 
                         <div class="component">
-                            <h4>🎯 xGI Component (20%)</h4>
-                            <p>Direct attacking contributions</p>
+                            <h4>🎯 xGI Component (25%)</h4>
+                            <p>Direct attacking contributions (DEF, MID, FWD only)</p>
                             <div class="formula-small">(xG + xA) per 90 minutes</div>
                         </div>
                     </div>
@@ -312,6 +344,7 @@
                             <li>Player <strong>not already</strong> in your squad</li>
                         </ul>
                     </div>
+                </div>
                 </div>
             </div>
         </div>
