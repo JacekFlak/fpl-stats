@@ -1,116 +1,5 @@
 /* Additional styles for AI Transfers page */
 
-.friends-buttons {
-    margin-top: 15px;
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.friend-btn {
-    padding: 10px 16px;
-    font-size: 0.95em;
-    border: 2px solid #04f5ff;
-    border-radius: 20px;
-    background: transparent;
-    color: #04f5ff;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.friend-btn:hover {
-    background: #04f5ff;
-    color: #37003c;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(4, 245, 255, 0.4);
-}
-
-.friend-btn:active {
-    transform: translateY(0);
-}
-
-/* Tabs Navigation */
-.tabs-container {
-    margin-bottom: 30px;
-    padding: 0 10px;
-}
-
-.tabs-nav {
-    display: flex;
-    gap: 0;
-    border-bottom: 3px solid #e0e0e0;
-    overflow-x: auto;
-}
-
-.tab-button {
-    padding: 15px 25px;
-    background: transparent;
-    border: none;
-    border-bottom: 3px solid transparent;
-    color: #666;
-    font-size: 1.1em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-}
-
-.tab-button:hover {
-    color: #37003c;
-    background: rgba(4, 245, 255, 0.05);
-}
-
-.tab-button.active {
-    color: #04f5ff;
-    border-bottom-color: #04f5ff;
-    background: rgba(4, 245, 255, 0.1);
-}
-
-.tab-content {
-    display: none;
-    animation: fadeIn 0.3s ease;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Responsive tabs */
-@media (max-width: 768px) {
-    .tabs-nav {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .tab-button {
-        padding: 12px 18px;
-        font-size: 1em;
-    }
-    
-    .fixtures-comparison {
-        grid-template-columns: 1fr;
-        gap: 20px;
-    }
-    
-    .fixture-item {
-        padding: 8px 14px;
-        font-size: 0.9em;
-    }
-}
-
 .nav-links {
     margin-bottom: 15px;
 }
@@ -282,24 +171,6 @@
 .fixture-item.very-hard {
     background: #cc0000;
     color: white;
-}
-
-.fixture-item.blank {
-    background: #666;
-    color: white;
-    font-weight: bold;
-    opacity: 0.7;
-}
-
-.fixture-item.double {
-    position: relative;
-    box-shadow: 0 0 0 2px #ffd700, inset 0 0 0 1px #ffd700;
-    animation: double-pulse 2s ease-in-out infinite;
-}
-
-@keyframes double-pulse {
-    0%, 100% { box-shadow: 0 0 0 2px #ffd700, inset 0 0 0 1px #ffd700; }
-    50% { box-shadow: 0 0 0 3px #ffd700, inset 0 0 0 2px #ffd700; }
 }
 
 .no-fixtures {
@@ -917,48 +788,6 @@
     border-color: #04f5ff;
 }
 
-.comparison-filters {
-    margin-bottom: 20px;
-    padding: 15px;
-    background: linear-gradient(135deg, #f0f4ff 0%, #fff5f0 100%);
-    border-radius: 8px;
-    border: 2px solid #04f5ff;
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-    align-items: flex-end;
-}
-
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
-    flex: 1;
-}
-
-.filter-group label {
-    font-weight: bold;
-    color: #37003c;
-    font-size: 1.05em;
-}
-
-.filter-select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    font-size: 0.95em;
-    background: white;
-    transition: all 0.3s ease;
-}
-
-.filter-select:focus {
-    outline: none;
-    border-color: #04f5ff;
-    box-shadow: 0 0 5px rgba(4, 245, 255, 0.3);
-}
-
 .position-selector {
     margin-bottom: 20px;
     padding: 15px;
@@ -1103,23 +932,6 @@
     font-weight: bold;
     color: #37003c;
     margin-bottom: 5px;
-}
-
-.player-team-filter {
-    width: 100%;
-    padding: 8px 12px;
-    border: 2px solid #ddd;
-    border-radius: 5px;
-    font-size: 0.95em;
-    background: white;
-    transition: all 0.3s ease;
-    margin-bottom: 8px;
-}
-
-.player-team-filter:focus {
-    outline: none;
-    border-color: #04f5ff;
-    box-shadow: 0 0 5px rgba(4, 245, 255, 0.3);
 }
 
 .player-search {
@@ -1589,23 +1401,5 @@
     
     .zoom-hint {
         text-align: center;
-    }
-    
-    .fixtures-comparison {
-        padding: 12px;
-    }
-    
-    .fixtures-column h5 {
-        font-size: 0.95em;
-    }
-    
-    .fixture-item {
-        padding: 10px 16px;
-        font-size: 0.95em;
-    }
-    
-    .section-btn {
-        width: 100%;
-        padding: 14px 20px;
     }
 }
