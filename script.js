@@ -1,10 +1,10 @@
 let TEAM_ID = 8668;
-let isLoading = false;
 const API_BASE = 'https://fantasy.premierleague.com/api';
 
 async function fetchWithProxy(url) {
     // Lista proxy do wypróbowania
     const proxies = [
+        '', // First try without proxy
         'https://corsproxy.io/?',
         'https://api.codetabs.com/v1/proxy?quest=',
         'https://api.allorigins.win/raw?url=',
@@ -12,16 +12,8 @@ async function fetchWithProxy(url) {
 
     for (let i = 0; i < proxies.length; i++) {
         try {
-            // Add delay between proxy attempts
-            if (i > 0) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
             const proxyUrl = proxies[i] ? `${proxies[i]}${encodeURIComponent(url)}` : url;
             console.log(`Attempt ${i + 1}: ${proxies[i] ? 'with proxy' : 'direct'}`);
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
             
             const response = await fetch(proxyUrl, {
                 method: 'GET',
@@ -29,11 +21,8 @@ async function fetchWithProxy(url) {
                     'Accept': 'application/json',
                 },
                 mode: proxies[i] ? 'cors' : 'cors',
-                cache: 'no-cache',
-                signal: controller.signal
+                cache: 'no-cache'
             });
-            
-            clearTimeout(timeoutId);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -859,12 +848,6 @@ function getChipShortName(chipName) {
 
 // Load team by ID
 async function loadTeamById() {
-    // Prevent multiple simultaneous loads
-    if (isLoading) {
-        console.log('Already loading, please wait...');
-        return;
-    }
-    
     const input = document.getElementById('teamIdInput');
     const newTeamId = parseInt(input.value);
     
@@ -873,7 +856,6 @@ async function loadTeamById() {
         return;
     }
     
-    isLoading = true;
     TEAM_ID = newTeamId;
     
     // Reset display
@@ -905,8 +887,6 @@ async function loadTeamById() {
         }
         
         showError(errorMessage);
-    } finally {
-        isLoading = false;
     }
 }
 
