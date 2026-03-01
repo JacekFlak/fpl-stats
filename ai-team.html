@@ -33,26 +33,18 @@
         <div id="content" style="display: none;">
             <!-- Best XI for Next GW -->
             <div class="section">
-                <h2>🏆 Best XI for Next Gameweek (1 GW)</h2>
-                <p class="section-subtitle">Highest Expected Points lineup according to the algorithm</p>
-                <div class="xi-section">
-                    <div class="pitch-container">
-                        <div class="pitch">
-                            <div class="pitch-section" id="xiPlayers"></div>
-                        </div>
-                        <div class="bench-section">
-                            <div class="bench-label">Bench</div>
-                            <div class="bench-players" id="xiBench"></div>
-                        </div>
-                    </div>
+                <h2>🏆 The Best starting XI for Next Gameweek (1 GW)</h2>
+               <div class="xi-section">
                     <div class="xi-summary" id="xiSummary"></div>
+                    <div class="pitch-container">
+                        <div class="pitch" id="xiPlayers"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Top Players by Expected Points (Next 5 GWs) -->
+            <!-- Top Players by Expected Points -->
             <div class="section">
-                <h2>⭐ Top Players by Expected Points (Next 5 GWs)</h2>
-                <p class="section-subtitle">Best players to consider for upcoming gameweeks</p>
+                <h2>⭐ Top Players by Expected Points (Next 5 GW)</h2>
                 <div id="topPlayers"></div>
             </div>
 
@@ -131,6 +123,7 @@
 
     <button id="scrollToTop" class="scroll-to-top" title="Scroll to top">↑</button>
 
+    <script src="xp-algorithm.js"></script>
     <script src="ai-team.js"></script>
 </body>
 </html>

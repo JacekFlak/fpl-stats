@@ -47,6 +47,32 @@ function getPositionName(type) {
     return positions[type] || 'Unknown';
 }
 
+// Helper function to get next full gameweek fixtures (gameweek that hasn't started yet)
+function getNextGameweekFixtures(fixturesData) {
+    if (!fixturesData || fixturesData.length === 0) return fixturesData;
+    
+    // Find the highest gameweek that has any finished fixture (current/latest completed GW)
+    const finishedFixtures = fixturesData.filter(f => f.finished);
+    let maxFinishedEvent = 0;
+    if (finishedFixtures.length > 0) {
+        maxFinishedEvent = Math.max(...finishedFixtures.map(f => f.event || 0));
+    }
+    
+    // Next full gameweek = max finished event + 1 (or if no finished yet, first unfinished)
+    let targetEvent;
+    if (maxFinishedEvent > 0) {
+        targetEvent = maxFinishedEvent + 1;
+    } else {
+        // No finished fixtures - find first unfinished event
+        const unfinished = fixturesData.filter(f => !f.finished).sort((a, b) => a.event - b.event);
+        targetEvent = unfinished.length > 0 ? unfinished[0].event : fixturesData[0].event;
+    }
+    
+    // Get all fixtures for the target gameweek
+    const nextGWFixtures = fixturesData.filter(f => f.event === targetEvent);
+    return nextGWFixtures.length > 0 ? nextGWFixtures : fixturesData;
+}
+
 // Helper function to organize fixtures by gameweek
 function getFixturesByGameweek(player, fixtures, numGameweeks) {
     if (!fixtures || fixtures.length === 0) return [];
@@ -121,130 +147,7 @@ function getFixtureDifficulty(difficulty) {
     return 'very-hard';
 }
 
-function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
-    let xP = 0;
-    const form = parseFloat(player.form) || 0;
-    const pointsPerGame = parseFloat(player.points_per_game) || 0;
-    
-    const expectedGoals = parseFloat(player.expected_goals || 0);
-    const expectedAssists = parseFloat(player.expected_assists || 0);
-    const expectedGoalInvolvements = parseFloat(player.expected_goal_involvements || 0);
-    const ictIndex = parseFloat(player.ict_index || 0);
-    const influence = parseFloat(player.influence || 0);
-    const creativity = parseFloat(player.creativity || 0);
-    const threat = parseFloat(player.threat || 0);
-    
-    const minutesPlayed = parseInt(player.minutes || 0);
-    const gamesStarted = parseInt(player.starts || 0);
-    const gamesPlayed = Math.max(gamesStarted, 1);
-    const avgMinutesPerGame = minutesPlayed / gamesPlayed;
-    
-    let availabilityFactor;
-    if (avgMinutesPerGame >= 60) {
-        availabilityFactor = 1.0;
-    } else if (avgMinutesPerGame >= 45) {
-        availabilityFactor = 0.75;
-    } else if (avgMinutesPerGame >= 30) {
-        availabilityFactor = 0.5;
-    } else if (avgMinutesPerGame > 0) {
-        availabilityFactor = 0.3;
-    } else {
-        availabilityFactor = 0.1;
-    }
-    
-    const chanceOfPlaying = parseInt(player.chance_of_playing_next_round || 100);
-    if (chanceOfPlaying < 100) {
-        availabilityFactor *= (chanceOfPlaying / 100);
-    }
-    
-    if (form === 0 && pointsPerGame === 0 && ictIndex === 0) {
-        return (player.total_points / Math.max(player.minutes / 90, 1) * numGameweeks) * availabilityFactor;
-    }
-    
-    // Get fixtures organized by gameweek (handles blank/double GWs)
-    const fixturesByGW = getFixturesByGameweek(player, fixtures, numGameweeks);
-    
-    if (fixturesByGW.length === 0) {
-        const baseXP = (form * 0.15 + pointsPerGame * 0.35 + (ictIndex / 20) * 0.5);
-        return baseXP * numGameweeks * availabilityFactor;
-    }
-    
-    const optaScore = (
-        (expectedGoals * 5) +
-        (expectedAssists * 3) +
-        (influence / 100) +
-        (creativity / 100) +
-        (threat / 100) +
-        (ictIndex / 50)
-    );
-    
-    const isDefender = player.element_type === 2;
-    const isGoalkeeper = player.element_type === 1;
-    const cleanSheetsPerGame = player.clean_sheets / Math.max(player.starts || 1, 1);
-    
-    // Process each gameweek (accounting for blank and double gameweeks)
-    fixturesByGW.forEach(gw => {
-        if (gw.isBlank) {
-            // Blank gameweek = 0 points
-            return;
-        }
-        
-        let gwPoints = 0;
-        
-        // Calculate points for each fixture in this gameweek
-        gw.fixtures.forEach(fixture => {
-            const isHome = fixture.team_h === player.team;
-            const difficulty = isHome ? fixture.team_h_difficulty : fixture.team_a_difficulty;
-            
-            const formComponent = form * 0.1;
-            const pointsPerGameComponent = pointsPerGame * 0.25;
-            const optaComponent = optaScore * 0.4;
-            const xGIComponent = isGoalkeeper ? 0 : (expectedGoalInvolvements * 0.25);
-            
-            let basePoints = formComponent + pointsPerGameComponent + optaComponent + xGIComponent;
-            
-            if (isDefender || isGoalkeeper) {
-                let cleanSheetProbability = 0;
-                
-                if (difficulty <= 2) {
-                    cleanSheetProbability = 0.50 + (cleanSheetsPerGame * 0.3);
-                } else if (difficulty === 3) {
-                    cleanSheetProbability = 0.30 + (cleanSheetsPerGame * 0.2);
-                } else {
-                    cleanSheetProbability = 0.15 + (cleanSheetsPerGame * 0.1);
-                }
-                
-                cleanSheetProbability = Math.min(Math.max(cleanSheetProbability, 0), 0.80);
-                
-                const expectedCleanSheetPoints = cleanSheetProbability * 4;
-                
-                if (isGoalkeeper) {
-                    const savesPerGame = player.saves / Math.max(player.starts || 1, 1);
-                    const expectedSavePoints = (savesPerGame / 3);
-                    basePoints += expectedSavePoints;
-                }
-                
-                basePoints += expectedCleanSheetPoints;
-            }
-            
-            const difficultyMultiplier = difficulty <= 2 ? 1.4 : difficulty <= 3 ? 1.0 : 0.65;
-            const venueMultiplier = 1.0;
-            
-            gwPoints += basePoints * difficultyMultiplier * venueMultiplier;
-        });
-        
-        // Apply double gameweek adjustment (rotation/fatigue factor)
-        if (gw.isDouble) {
-            // In double gameweeks, players don't score exactly 2x due to rotation and fatigue
-            // Apply 0.85 factor per game (so 2 games = 1.7x instead of 2.0x)
-            gwPoints *= 0.85;
-        }
-        
-        xP += gwPoints * availabilityFactor;
-    });
-    
-    return xP;
-}
+
 
 function buildOptimalXI(allPlayers, fixturesData) {
     // Build best XI for 1 GW (3-5-2 or similar formation)
@@ -324,13 +227,16 @@ function displayAiTeam(bootstrapData, fixturesResponse) {
     
     const fixturesData = fixturesResponse || [];
     
-    // Build optimal XI for 1 GW
-    const XI = buildOptimalXI(bootstrapData.elements, fixturesData);
+    // Get next gameweek fixtures for XI display (skip current GW if already started)
+    const nextGWFixtures = getNextGameweekFixtures(fixturesData);
+    
+    // Build optimal XI for next full GW
+    const XI = buildOptimalXI(bootstrapData.elements, nextGWFixtures);
     
     // Display XI on pitch
     displayXI(XI, teamsById, fixturesData);
     
-    // Display Top Players for 5 GWs
+    // Display Top Players for 5 GWs (use all future fixtures)
     displayTopPlayers(bootstrapData.elements, teamsById, fixturesData);
     
     document.getElementById('loading').style.display = 'none';
@@ -341,29 +247,34 @@ function displayXI(XI, teamsById, fixturesData) {
     let xiPlayers = '';
     
     // GKP
+    xiPlayers += '<div class="pitch-section pitch-section-gkp">';
     if (XI[1]) {
         xiPlayers += createPlayerElement(XI[1], teamsById, 'gkp', fixturesData);
     }
+    xiPlayers += '</div>';
     
     // DEF (3-5 players)
-    XI[2].forEach((player, idx) => {
+    xiPlayers += '<div class="pitch-section pitch-section-def">';
+    XI[2].forEach((player) => {
         xiPlayers += createPlayerElement(player, teamsById, 'def', fixturesData);
     });
+    xiPlayers += '</div>';
     
     // MID (5 players)
-    XI[3].forEach((player, idx) => {
+    xiPlayers += '<div class="pitch-section pitch-section-mid">';
+    XI[3].forEach((player) => {
         xiPlayers += createPlayerElement(player, teamsById, 'mid', fixturesData);
     });
+    xiPlayers += '</div>';
     
     // FWD (2 players)
-    XI[4].forEach((player, idx) => {
+    xiPlayers += '<div class="pitch-section pitch-section-fwd">';
+    XI[4].forEach((player) => {
         xiPlayers += createPlayerElement(player, teamsById, 'fwd', fixturesData);
     });
+    xiPlayers += '</div>';
     
     document.getElementById('xiPlayers').innerHTML = xiPlayers;
-    
-    // Display bench (remaining players or alternates)
-    displayXIBench(XI);
     
     // Display XI summary
     displayXISummary(XI, fixturesData);
@@ -371,42 +282,39 @@ function displayXI(XI, teamsById, fixturesData) {
 
 function createPlayerElement(player, teamsById, position, fixturesData) {
     const team = teamsById[player.team];
-    const xpOneGW = calculateExpectedPoints(player, fixturesData, 1);
+    // Calculate xP for 5 GW and divide by 5 to get normalized value for 1 match
+    const xp5GW = calculateExpectedPoints(player, fixturesData, 5);
+    const xpPerMatch = xp5GW / 5;
     const fixture = getNextFixtures(player, fixturesData, teamsById, 1)[0];
     let fixtureText = 'No fixture';
-    let fixtureClass = '';
     
     if (fixture) {
         if (fixture.isBlank) {
             fixtureText = 'BLANK';
-            fixtureClass = 'blank';
         } else {
             fixtureText = `vs ${fixture.opponent} ${fixture.isHome ? '(H)' : '(A)'}`;
             if (fixture.isDouble) {
                 fixtureText += ' 🔥';
-                fixtureClass = 'double';
             }
         }
     }
     
+    // Position emoji
+    const positionEmojis = {
+        'gkp': '🧤',
+        'def': '🛡️',
+        'mid': '⚽',
+        'fwd': '🎯'
+    };
+    const emoji = positionEmojis[position] || '⚽';
+    
     return `
-        <div class="player-tile" data-position="${position}">
-            <div class="player-name-tile">${player.web_name}</div>
-            <div class="player-team-tile">${team.short_name}</div>
-            <div class="player-xp-tile">${xpOneGW.toFixed(1)} xP</div>
-            <div class="player-fixture-tile ${fixtureClass}">${fixtureText}</div>
+        <div class="pitch-player">
+            <div class="player-emoji">${emoji}</div>
+            <div class="player-name">${player.web_name}<div style="margin-top: 2px; font-size: 0.75em; opacity: 0.85;">${fixtureText}</div></div>
+            <div class="player-points ai-xp">${xpPerMatch.toFixed(1)} xP</div>
         </div>
     `;
-}
-
-function displayXIBench(XI) {
-    const benchHTML = `
-        <div class="bench-label">🔄 Alternatives</div>
-        <div class="bench-players-grid">
-            <div class="bench-info">Squad built with 1 GKP + ${XI[2].length} DEF + ${XI[3].length} MID + ${XI[4].length} FWD</div>
-        </div>
-    `;
-    document.getElementById('xiBench').innerHTML = benchHTML;
 }
 
 function displayXISummary(XI, fixturesData) {
@@ -415,24 +323,24 @@ function displayXISummary(XI, fixturesData) {
     
     positions.forEach(pos => {
         if (pos === 1) {
-            if (XI[1]) totalXP += XI[1].xpOneGW;
+            if (XI[1]) {
+                const xp5GW = XI[1].xp5GW || calculateExpectedPoints(XI[1], fixturesData, 5);
+                totalXP += xp5GW / 5;
+            }
         } else {
             XI[pos].forEach(p => {
-                totalXP += p.xpOneGW;
+                const xp5GW = p.xp5GW || calculateExpectedPoints(p, fixturesData, 5);
+                totalXP += xp5GW / 5;
             });
         }
     });
     
     const summaryHTML = `
         <div class="xi-summary-card">
-            <div class="summary-title">⚡ Squad Statistics</div>
+            <div class="summary-title">⚡Expected Squad Statistics</div>
             <div class="summary-stat">
-                <span class="stat-label">Total xP (1 GW)</span>
+                <span class="stat-label">Total xP per Match</span>
                 <span class="stat-value highlight">${totalXP.toFixed(1)} points</span>
-            </div>
-            <div class="summary-stat">
-                <span class="stat-label">Average xP per Player</span>
-                <span class="stat-value">${(totalXP / 11).toFixed(2)} points</span>
             </div>
             <div class="summary-stat">
                 <span class="stat-label">Formation</span>
@@ -445,16 +353,16 @@ function displayXISummary(XI, fixturesData) {
 }
 
 function displayTopPlayers(allPlayers, teamsById, fixturesData) {
-    // Calculate xP for 5 GWs
+    // Calculate xP for 5 GW
     allPlayers.forEach(p => {
-        p.xpFiveGW = calculateExpectedPoints(p, fixturesData, 5);
+        p.xp5GW = calculateExpectedPoints(p, fixturesData, 5);
     });
     
     const topPlayersByPosition = {};
     [1, 2, 3, 4].forEach(pos => {
         topPlayersByPosition[pos] = allPlayers
             .filter(p => p.element_type === pos && p.chance_of_playing_next_round !== 0)
-            .sort((a, b) => b.xpFiveGW - a.xpFiveGW)
+            .sort((a, b) => b.xp5GW - a.xp5GW)
             .slice(0, 5);
     });
     
@@ -472,7 +380,7 @@ function displayTopPlayers(allPlayers, teamsById, fixturesData) {
                 </div>
                 <div class="players-grid">
                     ${players.map(p => {
-                        const xP = p.xpFiveGW;
+                        const xP = p.xp5GW;
                         return `
                             <div class="player-card">
                                 <div class="player-info">

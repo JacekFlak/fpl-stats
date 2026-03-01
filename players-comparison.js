@@ -59,83 +59,6 @@ function getPositionName(type) {
     return positions[type] || 'Unknown';
 }
 
-function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
-    let xP = 0;
-    const form = parseFloat(player.form) || 0;
-    const pointsPerGame = parseFloat(player.points_per_game) || 0;
-    const expectedGoals = parseFloat(player.expected_goals || 0);
-    const expectedAssists = parseFloat(player.expected_assists || 0);
-    const expectedGoalInvolvements = parseFloat(player.expected_goal_involvements || 0);
-    const ictIndex = parseFloat(player.ict_index || 0);
-    const influence = parseFloat(player.influence || 0);
-    const creativity = parseFloat(player.creativity || 0);
-    const threat = parseFloat(player.threat || 0);
-    
-    const minutesPlayed = parseInt(player.minutes || 0);
-    const gamesStarted = parseInt(player.starts || 1);
-    const avgMinutesPerGame = minutesPlayed / gamesStarted;
-    
-    let availabilityFactor = avgMinutesPerGame >= 60 ? 1.0 : avgMinutesPerGame >= 45 ? 0.75 : avgMinutesPerGame >= 30 ? 0.5 : avgMinutesPerGame > 0 ? 0.3 : 0.1;
-    const chanceOfPlaying = parseInt(player.chance_of_playing_next_round || 100);
-    if (chanceOfPlaying < 100) availabilityFactor *= (chanceOfPlaying / 100);
-    
-    if (form === 0 && pointsPerGame === 0 && ictIndex === 0) {
-        return (player.total_points / Math.max(player.minutes / 90, 1) * numGameweeks) * availabilityFactor;
-    }
-    
-    const playerFixtures = fixtures.filter(f => f.team === player.team && !f.finished).sort((a, b) => a.event - b.event).slice(0, numGameweeks);
-    
-    if (playerFixtures.length === 0) {
-        const baseXP = form * 0.15 + pointsPerGame * 0.35 + (ictIndex / 20) * 0.5;
-        return baseXP * numGameweeks * availabilityFactor;
-    }
-    
-    const optaScore = (expectedGoals * 5) + (expectedAssists * 3) + (influence / 100) + (creativity / 100) + (threat / 100) + (ictIndex / 50);
-    const isDefender = player.element_type === 2;
-    const isGoalkeeper = player.element_type === 1;
-    const cleanSheetsPerGame = player.clean_sheets / Math.max(player.starts || 1, 1);
-    
-    playerFixtures.forEach(fixture => {
-        const difficulty = fixture.difficulty || 3;
-        const formComponent = form * 0.1;
-        const pointsPerGameComponent = pointsPerGame * 0.25;
-        const optaComponent = optaScore * 0.4;
-        const xGIComponent = isGoalkeeper ? 0 : (expectedGoalInvolvements * 0.25);
-        
-        let basePoints = formComponent + pointsPerGameComponent + optaComponent + xGIComponent;
-        
-        if (isDefender || isGoalkeeper) {
-            let cleanSheetProbability = 0;
-            if (difficulty <= 2) {
-                cleanSheetProbability = 0.50 + (cleanSheetsPerGame * 0.3);
-            } else if (difficulty === 3) {
-                cleanSheetProbability = 0.30 + (cleanSheetsPerGame * 0.2);
-            } else {
-                cleanSheetProbability = 0.15 + (cleanSheetsPerGame * 0.1);
-            }
-            cleanSheetProbability = Math.min(Math.max(cleanSheetProbability, 0), 0.80);
-            const expectedCleanSheetPoints = cleanSheetProbability * 4;
-            
-            if (isGoalkeeper) {
-                const savesPerGame = player.saves / Math.max(player.starts || 1, 1);
-                const expectedSavePoints = (savesPerGame / 3);
-                basePoints += expectedSavePoints;
-            }
-            basePoints += expectedCleanSheetPoints;
-        }
-        
-        const difficultyMultiplier = difficulty <= 2 ? 1.4 : difficulty <= 3 ? 1.0 : 0.65;
-        xP += basePoints * difficultyMultiplier * availabilityFactor;
-    });
-    
-    if (playerFixtures.length < numGameweeks && playerFixtures.length > 0) {
-        const avgPerFixture = xP / playerFixtures.length;
-        xP = avgPerFixture * numGameweeks;
-    }
-    
-    return xP;
-}
-
 function loadPlayers() {
     const positionFilter = document.getElementById('positionFilter').value;
     const players = window.allPlayersData.filter(p => p.element_type == positionFilter).sort((a, b) => a.web_name.localeCompare(b.web_name));
@@ -202,6 +125,9 @@ function displayComparison(player1, player2, p1Data, p2Data, gameweeks) {
     const value2 = p2Data.expectedPoints / (p2Data.now_cost / 10);
     const winner = p1Data.expectedPoints > p2Data.expectedPoints ? player1 : player2;
     const winnerData = p1Data.expectedPoints > p2Data.expectedPoints ? p1Data : p2Data;
+    const loser = p1Data.expectedPoints > p2Data.expectedPoints ? player2 : player1;
+    const loserData = p1Data.expectedPoints > p2Data.expectedPoints ? p2Data : p1Data;
+    const difference = Math.abs(winnerData.expectedPoints - loserData.expectedPoints).toFixed(1);
     
     result.innerHTML = `
         <div class="comparison-results">
@@ -232,7 +158,7 @@ function displayComparison(player1, player2, p1Data, p2Data, gameweeks) {
             </div>
         </div>
         <div class="summary">
-            <p><strong>${winner.name}</strong> is expected to score <strong>${winnerData.expectedPoints.toFixed(1)}</strong> points in the next ${gameweeks} gameweeks, giving them the edge.</p>
+            <p><strong>${winner.name}</strong> is expected to score <strong>${winnerData.expectedPoints.toFixed(1)}</strong> points in the next ${gameweeks} gameweeks, which is <strong>${difference}</strong> more points than ${loser.name} (${loserData.expectedPoints.toFixed(1)}).</p>
         </div>
     `;
 }
