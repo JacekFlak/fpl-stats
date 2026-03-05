@@ -47,44 +47,36 @@ function getPositionName(type) {
     return positions[type] || 'Unknown';
 }
 
-// Helper function to get next full gameweek fixtures (gameweek that hasn't started yet)
 function getNextGameweekFixtures(fixturesData) {
     if (!fixturesData || fixturesData.length === 0) return fixturesData;
-    
-    // Find the highest gameweek that has any finished fixture (current/latest completed GW)
+
     const finishedFixtures = fixturesData.filter(f => f.finished);
     let maxFinishedEvent = 0;
     if (finishedFixtures.length > 0) {
         maxFinishedEvent = Math.max(...finishedFixtures.map(f => f.event || 0));
     }
     
-    // Next full gameweek = max finished event + 1 (or if no finished yet, first unfinished)
     let targetEvent;
     if (maxFinishedEvent > 0) {
         targetEvent = maxFinishedEvent + 1;
     } else {
-        // No finished fixtures - find first unfinished event
         const unfinished = fixturesData.filter(f => !f.finished).sort((a, b) => a.event - b.event);
         targetEvent = unfinished.length > 0 ? unfinished[0].event : fixturesData[0].event;
     }
-    
-    // Get all fixtures for the target gameweek
+
     const nextGWFixtures = fixturesData.filter(f => f.event === targetEvent);
     return nextGWFixtures.length > 0 ? nextGWFixtures : fixturesData;
 }
 
-// Helper function to organize fixtures by gameweek
 function getFixturesByGameweek(player, fixtures, numGameweeks) {
     if (!fixtures || fixtures.length === 0) return [];
-    
-    // Get all upcoming fixtures for this player's team
+
     const allTeamFixtures = fixtures
         .filter(f => !f.finished && f.event && (f.team_h === player.team || f.team_a === player.team))
         .sort((a, b) => a.event - b.event);
-    
+
     if (allTeamFixtures.length === 0) return [];
-    
-    // Get the next N gameweeks
+
     const firstGW = allTeamFixtures[0].event;
     const gameweeks = [];
     
@@ -150,42 +142,70 @@ function getFixtureDifficulty(difficulty) {
 
 
 function buildOptimalXI(allPlayers, fixturesData) {
-    // Build best XI for 1 GW (3-5-2 or similar formation)
-    // Calculate xP for all players for 1 GW
     allPlayers.forEach(p => {
         p.xpOneGW = calculateExpectedPoints(p, fixturesData, 1);
     });
-    
+
+    const isAvailable = (player) => {
+        const hasChance = player.chance_of_playing_next_round !== 0;
+        const isUnavailable = player.status === 'u';
+        return hasChance && !isUnavailable;
+    };
+
+    const sortedByPosition = {
+        1: allPlayers
+            .filter(p => p.element_type === 1 && isAvailable(p))
+            .sort((a, b) => b.xpOneGW - a.xpOneGW),
+        2: allPlayers
+            .filter(p => p.element_type === 2 && isAvailable(p))
+            .sort((a, b) => b.xpOneGW - a.xpOneGW),
+        3: allPlayers
+            .filter(p => p.element_type === 3 && isAvailable(p))
+            .sort((a, b) => b.xpOneGW - a.xpOneGW),
+        4: allPlayers
+            .filter(p => p.element_type === 4 && isAvailable(p))
+            .sort((a, b) => b.xpOneGW - a.xpOneGW)
+    };
+
     const XI = { 1: null, 2: [], 3: [], 4: [] };
-    const usedPositions = [];
-    
-    // Select 1 GKP
-    const gkps = allPlayers
-        .filter(p => p.element_type === 1 && p.chance_of_playing_next_round !== 0 && p.status === 'a')
-        .sort((a, b) => b.xpOneGW - a.xpOneGW);
-    XI[1] = gkps[0];
-    
-    // Select 5 DEF
-    const defs = allPlayers
-        .filter(p => p.element_type === 2 && p.chance_of_playing_next_round !== 0 && p.status === 'a')
-        .sort((a, b) => b.xpOneGW - a.xpOneGW)
-        .slice(0, 5);
-    XI[2] = defs;
-    
-    // Select 5 MID
-    const mids = allPlayers
-        .filter(p => p.element_type === 3 && p.chance_of_playing_next_round !== 0 && p.status === 'a')
-        .sort((a, b) => b.xpOneGW - a.xpOneGW)
-        .slice(0, 5);
-    XI[3] = mids;
-    
-    // Select 2 FWD
-    const fwds = allPlayers
-        .filter(p => p.element_type === 4 && p.chance_of_playing_next_round !== 0 && p.status === 'a')
-        .sort((a, b) => b.xpOneGW - a.xpOneGW)
-        .slice(0, 2);
-    XI[4] = fwds;
-    
+    if (sortedByPosition[1].length === 0) return XI;
+
+    const bestGkp = sortedByPosition[1][0];
+    let bestOutfield = null;
+
+    for (let defCount = 3; defCount <= 5; defCount++) {
+        for (let midCount = 2; midCount <= 5; midCount++) {
+            const fwdCount = 10 - defCount - midCount;
+            if (fwdCount < 1 || fwdCount > 3) continue;
+
+            const defs = sortedByPosition[2].slice(0, defCount);
+            const mids = sortedByPosition[3].slice(0, midCount);
+            const fwds = sortedByPosition[4].slice(0, fwdCount);
+
+            if (defs.length < defCount || mids.length < midCount || fwds.length < fwdCount) continue;
+
+            const outfieldXP = [...defs, ...mids, ...fwds].reduce((sum, player) => sum + player.xpOneGW, 0);
+
+            if (!bestOutfield || outfieldXP > bestOutfield.totalXP) {
+                bestOutfield = {
+                    totalXP: outfieldXP,
+                    defs,
+                    mids,
+                    fwds
+                };
+            }
+        }
+    }
+
+    if (!bestOutfield) {
+        return XI;
+    }
+
+    XI[1] = bestGkp;
+    XI[2] = bestOutfield.defs;
+    XI[3] = bestOutfield.mids;
+    XI[4] = bestOutfield.fwds;
+
     return XI;
 }
 
@@ -227,16 +247,12 @@ function displayAiTeam(bootstrapData, fixturesResponse) {
     
     const fixturesData = fixturesResponse || [];
     
-    // Get next gameweek fixtures for XI display (skip current GW if already started)
     const nextGWFixtures = getNextGameweekFixtures(fixturesData);
-    
-    // Build optimal XI for next full GW
+
     const XI = buildOptimalXI(bootstrapData.elements, nextGWFixtures);
-    
-    // Display XI on pitch
+
     displayXI(XI, teamsById, fixturesData);
-    
-    // Display Top Players for 5 GWs (use all future fixtures)
+
     displayTopPlayers(bootstrapData.elements, teamsById, fixturesData);
     
     document.getElementById('loading').style.display = 'none';
@@ -245,29 +261,25 @@ function displayAiTeam(bootstrapData, fixturesResponse) {
 
 function displayXI(XI, teamsById, fixturesData) {
     let xiPlayers = '';
-    
-    // GKP
+
     xiPlayers += '<div class="pitch-section pitch-section-gkp">';
     if (XI[1]) {
         xiPlayers += createPlayerElement(XI[1], teamsById, 'gkp', fixturesData);
     }
     xiPlayers += '</div>';
     
-    // DEF (3-5 players)
     xiPlayers += '<div class="pitch-section pitch-section-def">';
     XI[2].forEach((player) => {
         xiPlayers += createPlayerElement(player, teamsById, 'def', fixturesData);
     });
     xiPlayers += '</div>';
     
-    // MID (5 players)
     xiPlayers += '<div class="pitch-section pitch-section-mid">';
     XI[3].forEach((player) => {
         xiPlayers += createPlayerElement(player, teamsById, 'mid', fixturesData);
     });
     xiPlayers += '</div>';
     
-    // FWD (2 players)
     xiPlayers += '<div class="pitch-section pitch-section-fwd">';
     XI[4].forEach((player) => {
         xiPlayers += createPlayerElement(player, teamsById, 'fwd', fixturesData);
@@ -276,15 +288,12 @@ function displayXI(XI, teamsById, fixturesData) {
     
     document.getElementById('xiPlayers').innerHTML = xiPlayers;
     
-    // Display XI summary
     displayXISummary(XI, fixturesData);
 }
 
 function createPlayerElement(player, teamsById, position, fixturesData) {
     const team = teamsById[player.team];
-    // Calculate xP for 5 GW and divide by 5 to get normalized value for 1 match
-    const xp5GW = calculateExpectedPoints(player, fixturesData, 5);
-    const xpPerMatch = xp5GW / 5;
+    const xpPerMatch = player.xpOneGW !== undefined ? player.xpOneGW : calculateExpectedPoints(player, fixturesData, 1);
     const fixture = getNextFixtures(player, fixturesData, teamsById, 1)[0];
     let fixtureText = 'No fixture';
     
@@ -299,7 +308,6 @@ function createPlayerElement(player, teamsById, position, fixturesData) {
         }
     }
     
-    // Position emoji
     const positionEmojis = {
         'gkp': '🧤',
         'def': '🛡️',
@@ -324,13 +332,13 @@ function displayXISummary(XI, fixturesData) {
     positions.forEach(pos => {
         if (pos === 1) {
             if (XI[1]) {
-                const xp5GW = XI[1].xp5GW || calculateExpectedPoints(XI[1], fixturesData, 5);
-                totalXP += xp5GW / 5;
+                const xpOneGW = XI[1].xpOneGW !== undefined ? XI[1].xpOneGW : calculateExpectedPoints(XI[1], fixturesData, 1);
+                totalXP += xpOneGW;
             }
         } else {
             XI[pos].forEach(p => {
-                const xp5GW = p.xp5GW || calculateExpectedPoints(p, fixturesData, 5);
-                totalXP += xp5GW / 5;
+                const xpOneGW = p.xpOneGW !== undefined ? p.xpOneGW : calculateExpectedPoints(p, fixturesData, 1);
+                totalXP += xpOneGW;
             });
         }
     });
@@ -339,7 +347,7 @@ function displayXISummary(XI, fixturesData) {
         <div class="xi-summary-card">
             <div class="summary-title">⚡Expected Squad Statistics</div>
             <div class="summary-stat">
-                <span class="stat-label">Total xP per Match</span>
+                <span class="stat-label">Total xP</span>
                 <span class="stat-value highlight">${totalXP.toFixed(1)} points</span>
             </div>
             <div class="summary-stat">
@@ -353,7 +361,6 @@ function displayXISummary(XI, fixturesData) {
 }
 
 function displayTopPlayers(allPlayers, teamsById, fixturesData) {
-    // Calculate xP for 5 GW
     allPlayers.forEach(p => {
         p.xp5GW = calculateExpectedPoints(p, fixturesData, 5);
     });
@@ -423,7 +430,6 @@ function showError(message) {
     errorDiv.style.display = 'block';
 }
 
-// Scroll to top
 const scrollToTopBtn = document.getElementById('scrollToTop');
 
 window.addEventListener('scroll', () => {
@@ -438,12 +444,10 @@ scrollToTopBtn.addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// Auto-load on page load
 window.addEventListener('DOMContentLoaded', () => {
     buildAITeam();
 });
 
-// Toggle methodology
 function toggleMethodology() {
     const content = document.getElementById('methodologyContent');
     const icon = document.querySelector('.methodology .toggle-icon');

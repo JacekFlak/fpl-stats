@@ -238,5 +238,20 @@ document.getElementById('scrollToTop')?.addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
+function toggleMethodology() {
+    const content = document.getElementById('comparisonMethodologyContent');
+    const icon = document.querySelector('.methodology .toggle-icon');
+
+    if (!content || !icon) return;
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.classList.add('rotated');
+    } else {
+        content.style.display = 'none';
+        icon.classList.remove('rotated');
+    }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', init);
