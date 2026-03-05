@@ -1,0 +1,231 @@
+/* Shared xP methodology styles */
+.methodology {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid #00cc6a;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 2rem;
+}
+
+.methodology h2 {
+    color: #00cc6a;
+    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.methodology h2:hover {
+    color: #04f5ff;
+}
+
+.methodology h2 .toggle-icon {
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+
+.methodology h2 .toggle-icon.rotated {
+    transform: rotate(-180deg);
+}
+
+.methodology-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.methodology-content .intro {
+    text-align: center;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    color: #e0e0e0;
+}
+
+.formula-box {
+    background: #0f3460;
+    border: 2px solid #04f5ff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    text-align: center;
+}
+
+.formula-box h3 {
+    color: #04f5ff;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+.formula {
+    font-family: 'Courier New', monospace;
+    font-size: 1.15rem;
+    color: #00ff87;
+    background: rgba(0, 255, 135, 0.1);
+    padding: 1rem;
+    border-radius: 6px;
+    font-weight: bold;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.formula-small {
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    color: #04f5ff;
+    background: rgba(4, 245, 255, 0.1);
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    display: inline-block;
+}
+
+.components-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.component {
+    background: rgba(55, 0, 60, 0.3);
+    border: 1px solid #37003c;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.component.highlight {
+    background: rgba(0, 204, 106, 0.1);
+    border: 2px solid #00cc6a;
+}
+
+.component h4 {
+    color: #00cc6a;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.component p {
+    color: #ccc;
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.component ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 1rem;
+}
+
+.component ul li {
+    color: #e0e0e0;
+    padding: 0.4rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    line-height: 1.4;
+}
+
+.component ul li::before {
+    content: '▸';
+    color: #04f5ff;
+    position: absolute;
+    left: 0;
+}
+
+.multipliers {
+    margin: 2rem 0;
+}
+
+.multipliers h3 {
+    color: #04f5ff;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.4rem;
+}
+
+.multiplier-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.multiplier {
+    background: rgba(4, 245, 255, 0.05);
+    border: 1px solid #04f5ff;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.multiplier h4 {
+    color: #04f5ff;
+    margin-bottom: 1rem;
+}
+
+.multiplier ul {
+    list-style: none;
+    padding: 0;
+}
+
+.multiplier ul li {
+    padding: 0.5rem 0;
+    color: #e0e0e0;
+}
+
+.multiplier .easy {
+    color: #00ff87;
+    font-weight: bold;
+}
+
+.multiplier .medium {
+    color: #ffd700;
+    font-weight: bold;
+}
+
+.multiplier .hard {
+    color: #ff4444;
+    font-weight: bold;
+}
+
+.multiplier .small-text {
+    font-size: 0.9rem;
+    color: #999;
+    margin-top: 0.5rem;
+}
+
+.value-calculation {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05));
+    border: 2px solid #ffd700;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.value-calculation h3 {
+    color: #ffd700;
+    margin-bottom: 1rem;
+}
+
+.value-calculation p {
+    color: #ccc;
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .methodology {
+        padding: 1.5rem;
+    }
+
+    .methodology h2 {
+        font-size: 1.4rem;
+    }
+
+    .components-grid,
+    .multiplier-grid {
+        grid-template-columns: 1fr;
+    }
+}
