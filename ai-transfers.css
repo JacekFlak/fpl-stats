@@ -1402,4 +1402,32 @@
     .zoom-hint {
         text-align: center;
     }
+    
+    .fixtures-comparison {
+        padding: 12px;
+    }
+    
+    .fixtures-column h5 {
+        font-size: 0.95em;
+    }
+    
+    .fixture-item {
+        padding: 10px 16px;
+        font-size: 0.95em;
+    }
+
+    .player-info,
+    .filter-group,
+    .player-select-group {
+        min-width: 0;
+    }
+
+    .comparison-controls {
+        gap: 10px;
+    }
+    
+    .section-btn {
+        width: 100%;
+        padding: 14px 20px;
+    }
 }

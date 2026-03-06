@@ -517,6 +517,15 @@ footer .disclaimer {
     min-width: 80px;
 }
 
+.player-emoji {
+    font-size: 2.5em;
+    line-height: 1;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .player-shirt {
     width: 60px;
     height: 60px;

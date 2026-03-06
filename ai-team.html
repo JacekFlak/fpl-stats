@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Team - FPL Stats</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="ai-team.css">
+    <link rel="stylesheet" href="xp-calculation.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AI Team</h1>
+            <nav class="nav-links">
+                <a href="index.html" style="color: #00ff87; text-decoration: none; font-size: 1.1em; font-weight: bold;">← Back to Stats</a>
+            </nav>
+            <div class="section-buttons">
+                <a href="players-comparison.html" class="section-btn" style="color: #04f5ff; text-decoration: none;">⚖️ Compare Players</a>
+            </div>
+        </header>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Building optimal AI team...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <div class="section">
+                <h2>🏆 The best starting XI for the next GW by AI</h2>
+               <div class="xi-section">
+                    <div class="xi-summary" id="xiSummary"></div>
+                    <div class="pitch-container">
+                        <div class="pitch" id="xiPlayers"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>⭐ Top Players by Expected Points (Next 5 GW)</h2>
+                <div id="topPlayers"></div>
+            </div>
+
+            <div class="section methodology">
+                <h2 class="collapsible-header" onclick="toggleMethodology()">
+                    📊 How Expected Points (xP) are Calculated
+                    <span class="toggle-icon">▼</span>
+                </h2>
+                <div class="methodology-content" id="methodologyContent" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Powered by <a href="https://jacek-flak.com" target="_blank" rel="noopener noreferrer">jSoft Jacek Flak</a></p>
+        <p class="disclaimer">This website is an independent fan project.<br>
+        It is not affiliated with or endorsed by the Premier League or any football club.</p>
+    </footer>
+
+    <button id="scrollToTop" class="scroll-to-top" title="Scroll to top">↑</button>
+
+    <script src="xp-algorithm.js"></script>
+    <script src="xp-calculation.js"></script>
+    <script src="ai-team.js"></script>
+</body>
+</html>

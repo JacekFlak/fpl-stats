@@ -1,6 +1,17 @@
-# FPL Stats - Fantasy Premier League Statistics & AI Transfer Advisor
+# FPL Stats - Fantasy Premier League Statistics & AI Tools
 
-Advanced statistics dashboard and AI-powered transfer recommendation system for Fantasy Premier League managers.
+Advanced statistics dashboard, AI-powered transfer advisor, team builder, and player comparison tools for Fantasy Premier League managers.
+
+## Quick Start
+
+1. Clone or download this repository
+2. Open any HTML file in your web browser:
+   - **index.html** - View your team statistics
+   - **ai-transfers.html** - Get AI transfer recommendations
+   - **ai-team.html** - Build optimal starting XI
+   - **players-comparison.html** - Compare players side-by-side
+3. Enter your FPL Team ID when prompted (or use AI tools without ID)
+4. Enjoy data-driven FPL management!
 
 ## Features
 
@@ -30,6 +41,23 @@ Advanced statistics dashboard and AI-powered transfer recommendation system for 
 - **Detailed Reasoning**: Explains why each transfer is recommended
 - **Top Performers**: Lists highest xP players by position
 
+### 🤖 AI Team Builder (ai-team.html)
+- **Optimal Starting XI**: AI generates the best possible starting lineup for the next gameweek
+- **Expected Points Optimization**: Selects the highest xP players within budget constraints
+- **Interactive Pitch View**: Visual representation of the team formation
+- **Team Summary**: Total expected points and team value
+- **Top Players by Position**: Lists best performers for each position over next 5 gameweeks
+- **Budget-Optimized Selection**: £100.0M budget with optimal value calculations
+
+### ⚖️ Player Comparison Tool (players-comparison.html)
+- **Side-by-Side Comparison**: Compare up to 3 players simultaneously
+- **Expected Points Analysis**: View xP for 1, 3, or 5 gameweeks ahead
+- **Detailed Statistics**: Compare form, PPG, price, ICT index, xG, xA, and more
+- **Position Filtering**: Filter players by position (GKP, DEF, MID, FWD)
+- **Fixture Analysis**: View upcoming fixtures with difficulty ratings
+- **Visual Comparison**: Easy-to-read comparison cards with key metrics
+- **Search Functionality**: Quick player search with dropdown selection
+
 ## How to Use
 
 ### Statistics Dashboard
@@ -43,6 +71,20 @@ Advanced statistics dashboard and AI-powered transfer recommendation system for 
 3. Click "Analyze Team" to receive AI-powered transfer recommendations
 4. Review suggestions with expected points improvements and reasoning
 5. Browse top performing players by position
+
+### AI Team Builder
+1. Open `ai-team.html` in your browser
+2. The AI automatically generates the optimal starting XI for the next gameweek
+3. View the team formation on the interactive pitch
+4. Browse top players by position for the next 5 gameweeks
+5. See total expected points and team value
+
+### Player Comparison Tool
+1. Open `players-comparison.html` in your browser
+2. Select a position (GKP, DEF, MID, FWD) to filter players
+3. Choose comparison timeframe (1, 3, or 5 gameweeks)
+4. Search and select up to 3 players to compare
+5. Review detailed statistics, xP, fixtures, and metrics side-by-side
 
 ## Team ID
 Your Team ID can be found in the Fantasy Premier League website URL:
@@ -140,11 +182,18 @@ The algorithm combines traditional FPL metrics (form, PPG) with advanced Opta st
 ```
 fpl-stats/
 ├── index.html              # Main statistics dashboard
-├── ai-transfers.html       # AI transfer advisor page
-├── style.css              # Shared styles for both pages
-├── ai-transfers.css       # AI page specific styles
+├── style.css              # Shared styles for all pages
 ├── script.js              # Main dashboard logic
+├── ai-transfers.html       # AI transfer advisor page
+├── ai-transfers.css       # AI transfer page specific styles
 ├── ai-transfers.js        # AI analysis and transfer logic
+├── ai-team.html           # AI team builder page
+├── ai-team.css            # AI team page specific styles
+├── ai-team.js             # AI team generation logic
+├── players-comparison.html # Player comparison page
+├── players-comparison.css  # Player comparison styles
+├── players-comparison.js   # Player comparison logic
+├── xp-algorithm.js        # Expected points algorithm
 └── README.md              # This file
 ```
 

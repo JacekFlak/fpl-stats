@@ -13,7 +13,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>⚽ Fantasy Premier League</h1>
+            <h1>⚽ FPL Stats</h1>
             <nav class="nav-links" style="margin-bottom: 15px;">
                 <a href="ai-transfers.html" style="color: #00ff87; text-decoration: none; font-size: 1.1em; font-weight: bold;">🤖 AI Transfer Suggestions →</a>
             </nav>
@@ -21,6 +21,17 @@
                 <label for="teamIdInput">Team ID:</label>
                 <input type="text" id="teamIdInput" value="8668" placeholder="Enter Team ID" pattern="[0-9]*" inputmode="numeric">
                 <button onclick="loadTeamById()">Search</button>
+            </div>
+            <div class="friends-buttons">
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 8668; loadTeamById();">JF</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 3662629; loadTeamById();">MS</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 8385816; loadTeamById();">MK</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 2684590; loadTeamById();">RL</button>
+                <button class="friend-btn" onclick="document.getElementById('teamIdInput').value = 131062; loadTeamById();">OG</button>
+            </div>
+            <div class="section-buttons">
+                <a href="players-comparison.html" class="section-btn" style="color: #04f5ff; text-decoration: none;">⚖️ Compare Players</a>
+                <a href="ai-team.html" class="section-btn" style="color: #00ff87; text-decoration: none;">🤖 AI Team</a>
             </div>
             <div class="team-name" id="teamName"></div>
         </header>
@@ -34,16 +45,13 @@
 
         <div id="content" style="display: none;">
 
-            <!-- Manager Information -->
             <div class="section">
                 <h2>Manager</h2>
                 <div class="manager-info" id="managerInfo"></div>
             </div>
 
-            <!-- Podstawowe statystyki -->
             <div class="stats-grid" id="statsGrid"></div>
 
-            <!-- Latest Gameweek Squad -->
             <div class="section">
                 <h2 id="squadTitle">Latest Gameweek Squad</h2>
                 <div class="pitch-container">
@@ -56,7 +64,6 @@
                 </div>
             </div>
 
-            <!-- Points Chart -->
             <div class="section">
                 <div class="chart-container" id="pointsChartContainer">
                     <div class="chart-header">
@@ -73,7 +80,6 @@
                 </div>
             </div>
 
-            <!-- Ranking Chart -->
             <div class="section">
                 <div class="chart-container" id="rankingChartContainer">
                     <div class="chart-header">
@@ -90,7 +96,6 @@
                 </div>
             </div>
 
-            <!-- Season History -->
             <div class="section">
                 <h2>Season History (All Gameweeks)</h2>
                 <table id="seasonHistory">
@@ -110,7 +115,6 @@
                 </table>
             </div>
 
-            <!-- Chips -->
             <div class="section">
                 <h2>Used chips</h2>
                 <div id="chips"></div>
