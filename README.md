@@ -41,7 +41,7 @@ Advanced statistics dashboard, AI-powered transfer advisor, team builder, and pl
 - **Detailed Reasoning**: Explains why each transfer is recommended
 - **Top Performers**: Lists highest xP players by position
 
-### 🤖 AI Team Builder (ai-team.html)
+### 🤖 AI Starting XI (ai-team.html)
 - **Optimal Starting XI**: AI generates the best possible starting lineup for the next gameweek
 - **Expected Points Optimization**: Selects the highest xP players within budget constraints
 - **Interactive Pitch View**: Visual representation of the team formation
@@ -72,7 +72,7 @@ Advanced statistics dashboard, AI-powered transfer advisor, team builder, and pl
 4. Review suggestions with expected points improvements and reasoning
 5. Browse top performing players by position
 
-### AI Team Builder
+### AI Starting XI
 1. Open `ai-team.html` in your browser
 2. The AI automatically generates the optimal starting XI for the next gameweek
 3. View the team formation on the interactive pitch
@@ -187,9 +187,9 @@ fpl-stats/
 ├── ai-transfers.html       # AI transfer advisor page
 ├── ai-transfers.css       # AI transfer page specific styles
 ├── ai-transfers.js        # AI analysis and transfer logic
-├── ai-team.html           # AI team builder page
-├── ai-team.css            # AI team page specific styles
-├── ai-team.js             # AI team generation logic
+├── ai-team.html           # AI Starting XI page
+├── ai-team.css            # AI Starting XI page specific styles
+├── ai-team.js             # AI Starting XI generation logic
 ├── players-comparison.html # Player comparison page
 ├── players-comparison.css  # Player comparison styles
 ├── players-comparison.js   # Player comparison logic
