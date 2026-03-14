@@ -1,20 +1,7 @@
 /* Additional styles for AI Transfers page */
 
-.nav-links {
-    margin-bottom: 15px;
-}
-
-.nav-links a {
-    color: #00cc6a;
-    text-decoration: none;
-    font-size: 1.1em;
-    font-weight: bold;
-    transition: all 0.3s ease;
-}
-
-.nav-links a:hover {
-    color: #04f5ff;
-    text-shadow: 0 0 10px rgba(0, 255, 135, 0.5);
+.shortcut-buttons {
+    margin-bottom: 25px;
 }
 
 .ai-suggestions {
