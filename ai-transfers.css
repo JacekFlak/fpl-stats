@@ -95,11 +95,26 @@
 .transfer-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 15px;
     font-size: 1.2em;
     font-weight: bold;
     color: #37003c;
+}
+
+.transfer-header > span {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.transfer-header .ai-badge {
+    flex: 0 0 auto;
+}
+
+.transfer-header .transfer-arrow {
+    flex: 0 0 auto;
 }
 
 .fixtures-comparison {
@@ -743,6 +758,22 @@
     #topPlayers {
         grid-template-columns: 1fr;
     }
+
+    .transfer-header {
+        font-size: 1.05em;
+        gap: 8px;
+    }
+
+    .transfer-header .ai-badge {
+        width: 100%;
+        text-align: center;
+        margin-right: 0;
+        margin-bottom: 4px;
+    }
+
+    .transfer-header .position-badge {
+        margin-left: 0;
+    }
     
     .comparison-grid {
         grid-template-columns: 1fr !important;
@@ -760,6 +791,16 @@
     
     .vs-divider {
         display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .transfer-suggestion {
+        padding: 14px;
+    }
+
+    .transfer-header {
+        font-size: 1em;
     }
 }
 

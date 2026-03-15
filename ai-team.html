@@ -26,14 +26,18 @@
 
         <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
-            <p>Building optimal AI Starting XI...</p>
+            <p id="loadingText">Building optimal AI Starting XI...</p>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="loadingProgress"></div>
+            </div>
+            <p class="progress-pct" id="loadingPct">0%</p>
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
 
         <div id="content" style="display: none;">
             <div class="section">
-                <h2>🏆 The best starting XI for the next GW by AI</h2>
+                <h2 id="aiTeamHeader">🏆 The best starting XI for the next GW by AI</h2>
                <div class="xi-section">
                     <div class="xi-summary" id="xiSummary"></div>
                     <div class="pitch-container">

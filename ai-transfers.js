@@ -245,6 +245,15 @@ function generateTransferReason(playerOut, playerIn, costDiff) {
     return reasons.join('. ') + '.';
 }
 
+function setLoadingProgress(pct, text) {
+    const fill = document.getElementById('loadingProgress');
+    const label = document.getElementById('loadingPct');
+    const msg = document.getElementById('loadingText');
+    if (fill) fill.style.width = pct + '%';
+    if (label) label.textContent = Math.round(pct) + '%';
+    if (msg && text) msg.textContent = text;
+}
+
 async function analyzeTeam() {
     // Prevent multiple simultaneous loads
     if (isLoading) {
@@ -267,27 +276,31 @@ async function analyzeTeam() {
     document.getElementById('content').style.display = 'none';
     document.getElementById('error').style.display = 'none';
     document.getElementById('loading').style.display = 'block';
+    setLoadingProgress(0, 'Analyzing your team with AI...');
     
     try {
         console.log('Fetching team data...');
-        const [teamData, bootstrapData, fixturesResponse] = await Promise.all([
-            fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/`),
-            fetchWithProxy(`${API_BASE}/bootstrap-static/`),
-            fetchWithProxy(`${API_BASE}/fixtures/`)
-        ]);
+        setLoadingProgress(10, 'Fetching team data...');
+        const teamData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/`);
+        setLoadingProgress(30, 'Fetching player data...');
+        const bootstrapData = await fetchWithProxy(`${API_BASE}/bootstrap-static/`);
+        setLoadingProgress(55, 'Fetching fixtures...');
+        const fixturesResponse = await fetchWithProxy(`${API_BASE}/fixtures/`);
         
         console.log('Fetching current team picks...');
+        setLoadingProgress(70, 'Fetching squad picks...');
         const currentEvent = bootstrapData.events.find(e => e.is_current)?.id || 1;
         const picksData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/event/${currentEvent}/picks/`);
         
         console.log('Fixtures loaded:', fixturesResponse?.length || 0);
         
-        console.log('Calculating Expected Points with AI algorithm...');
-        // Allow additional time for xP calculations (especially xCS for defenders/goalkeepers)
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        setLoadingProgress(85, 'Calculating Expected Points...');
+        await new Promise(resolve => setTimeout(resolve, 400));
         
+        setLoadingProgress(95, 'Generating recommendations...');
         console.log('Processing data...');
         displayAnalysis(teamData, bootstrapData, picksData, fixturesResponse);
+        setLoadingProgress(100, 'Done!');
     } catch (error) {
         console.error('Error:', error);
         showError('Failed to load team data. Please try again.');
