@@ -18,78 +18,110 @@
  * @returns {number} Expected Points total
  */
 function calculateExpectedPoints(player, fixtures, numGameweeks = 5) {
-    let xP = 0;
     const form = parseFloat(player.form) || 0;
     const pointsPerGame = parseFloat(player.points_per_game) || 0;
-    const expectedGoals = parseFloat(player.expected_goals || 0);
-    const expectedAssists = parseFloat(player.expected_assists || 0);
-    const expectedGoalInvolvements = parseFloat(player.expected_goal_involvements || 0);
-    const ictIndex = parseFloat(player.ict_index || 0);
-    const influence = parseFloat(player.influence || 0);
-    const creativity = parseFloat(player.creativity || 0);
-    const threat = parseFloat(player.threat || 0);
-    
+    const gamesStarted = Math.max(parseInt(player.starts || 0), 1);
     const minutesPlayed = parseInt(player.minutes || 0);
-    const gamesStarted = parseInt(player.starts || 1);
     const avgMinutesPerGame = minutesPlayed / gamesStarted;
-    
-    let availabilityFactor = avgMinutesPerGame >= 60 ? 1.0 : avgMinutesPerGame >= 45 ? 0.75 : avgMinutesPerGame >= 30 ? 0.5 : avgMinutesPerGame > 0 ? 0.3 : 0.1;
+
+    // Availability factor based on average playing time.
+    let availabilityFactor = avgMinutesPerGame >= 60 ? 1.0
+                           : avgMinutesPerGame >= 45 ? 0.75
+                           : avgMinutesPerGame >= 30 ? 0.5
+                           : avgMinutesPerGame > 0  ? 0.3
+                           : 0.1;
     const chanceOfPlaying = parseInt(player.chance_of_playing_next_round || 100);
-    if (chanceOfPlaying < 100) availabilityFactor *= (chanceOfPlaying / 100);
-    
-    if (form === 0 && pointsPerGame === 0 && ictIndex === 0) {
-        return (player.total_points / Math.max(player.minutes / 90, 1) * numGameweeks) * availabilityFactor;
-    }
-    
-    const playerFixtures = fixtures.filter(f => f.team === player.team && !f.finished).sort((a, b) => a.event - b.event).slice(0, numGameweeks);
-    
-    if (playerFixtures.length === 0) {
-        const baseXP = form * 0.15 + pointsPerGame * 0.35 + (ictIndex / 20) * 0.5;
+    if (chanceOfPlaying < 100) availabilityFactor *= chanceOfPlaying / 100;
+
+    // Normalize cumulative season Opta stats → per-game rates.
+    const xGIPerGame  = parseFloat(player.expected_goal_involvements || 0) / gamesStarted;
+    const ictPerGame  = parseFloat(player.ict_index   || 0) / gamesStarted;
+    const xGPerGame   = parseFloat(player.expected_goals   || 0) / gamesStarted;
+    const xAPerGame   = parseFloat(player.expected_assists || 0) / gamesStarted;
+    const infPerGame  = parseFloat(player.influence   || 0) / gamesStarted;
+    const crePerGame  = parseFloat(player.creativity  || 0) / gamesStarted;
+    const thrPerGame  = parseFloat(player.threat      || 0) / gamesStarted;
+
+    // Handle raw API fixtures (team_h / team_a) and pre-mapped fixtures (team / difficulty).
+    const allTeamFixtures = fixtures
+        .filter(f => {
+            const inTeam = f.team === player.team
+                        || f.team_h === player.team
+                        || f.team_a === player.team;
+            return inTeam && !f.finished && f.event != null;
+        })
+        .map(f => {
+            if (f.difficulty != null) return f; // already mapped
+            const isHome = f.team_h === player.team;
+            return {
+                ...f,
+                team: player.team,
+                difficulty: isHome ? f.team_h_difficulty : f.team_a_difficulty
+            };
+        })
+        .sort((a, b) => a.event - b.event);
+
+    // No fixtures at all → form-based estimate.
+    if (allTeamFixtures.length === 0) {
+        const baseXP = form * 0.35 + pointsPerGame * 0.40 + ictPerGame * 0.25;
         return baseXP * numGameweeks * availabilityFactor;
     }
-    
-    const optaScore = (expectedGoals * 5) + (expectedAssists * 3) + (influence / 100) + (creativity / 100) + (threat / 100) + (ictIndex / 50);
-    const isDefender = player.element_type === 2;
+
+    // Collect the next numGameweeks distinct events (supporting DGW: multiple fixtures per event).
+    const eventsSeen = [];
+    const playerFixtures = [];
+    for (const f of allTeamFixtures) {
+        if (!eventsSeen.includes(f.event)) {
+            if (eventsSeen.length >= numGameweeks) break;
+            eventsSeen.push(f.event);
+        }
+        playerFixtures.push(f);
+    }
+
+    const isDefender   = player.element_type === 2;
     const isGoalkeeper = player.element_type === 1;
-    const cleanSheetsPerGame = player.clean_sheets / Math.max(player.starts || 1, 1);
-    
+    const cleanSheetsPerGame = parseFloat(player.clean_sheets || 0) / gamesStarted;
+    const savesPerGame = parseFloat(player.saves || 0) / gamesStarted;
+
+    // Per-game Opta composite (all values already per-game).
+    const optaPerGame = (xGPerGame * 5) + (xAPerGame * 3)
+                      + (infPerGame / 100) + (crePerGame / 100)
+                      + (thrPerGame / 100) + (ictPerGame / 50);
+
+    let xP = 0;
     playerFixtures.forEach(fixture => {
         const difficulty = fixture.difficulty || 3;
-        const formComponent = form * 0.1;
-        const pointsPerGameComponent = pointsPerGame * 0.25;
-        const optaComponent = optaScore * 0.4;
-        const xGIComponent = isGoalkeeper ? 0 : (expectedGoalInvolvements * 0.25);
-        
-        let basePoints = formComponent + pointsPerGameComponent + optaComponent + xGIComponent;
-        
+
+        // Weights: form 35 % · PPG 30 % · Opta 20 % · xGI 15 %
+        const formComponent   = form         * 0.35;
+        const ppgComponent    = pointsPerGame * 0.30;
+        const optaComponent   = optaPerGame  * 0.20;
+        const xGIComponent    = isGoalkeeper ? 0 : xGIPerGame * 0.15;
+
+        let basePoints = formComponent + ppgComponent + optaComponent + xGIComponent;
+
+        // Defensive / goalkeeper bonuses.
         if (isDefender || isGoalkeeper) {
-            let cleanSheetProbability = 0;
-            if (difficulty <= 2) {
-                cleanSheetProbability = 0.50 + (cleanSheetsPerGame * 0.3);
-            } else if (difficulty === 3) {
-                cleanSheetProbability = 0.30 + (cleanSheetsPerGame * 0.2);
-            } else {
-                cleanSheetProbability = 0.15 + (cleanSheetsPerGame * 0.1);
-            }
-            cleanSheetProbability = Math.min(Math.max(cleanSheetProbability, 0), 0.80);
-            const expectedCleanSheetPoints = cleanSheetProbability * 4;
-            
-            if (isGoalkeeper) {
-                const savesPerGame = player.saves / Math.max(player.starts || 1, 1);
-                const expectedSavePoints = (savesPerGame / 3);
-                basePoints += expectedSavePoints;
-            }
-            basePoints += expectedCleanSheetPoints;
+            let csp = difficulty <= 2 ? 0.50 + cleanSheetsPerGame * 0.3
+                    : difficulty === 3 ? 0.30 + cleanSheetsPerGame * 0.2
+                    : 0.15 + cleanSheetsPerGame * 0.1;
+            csp = Math.min(Math.max(csp, 0), 0.80);
+            basePoints += csp * 4;
+            if (isGoalkeeper) basePoints += savesPerGame / 3;
         }
-        
-        const difficultyMultiplier = difficulty <= 2 ? 1.4 : difficulty <= 3 ? 1.0 : 0.65;
-        xP += basePoints * difficultyMultiplier * availabilityFactor;
+
+        const diffMult = difficulty <= 2 ? 1.35
+                       : difficulty === 3 ? 1.0
+                       : difficulty === 4 ? 0.70
+                       : 0.55;
+        xP += basePoints * diffMult * availabilityFactor;
     });
-    
-    if (playerFixtures.length < numGameweeks && playerFixtures.length > 0) {
-        const avgPerFixture = xP / playerFixtures.length;
-        xP = avgPerFixture * numGameweeks;
+
+    // If fewer fixtures found than requested GWs, extrapolate by average.
+    const eventsFound = eventsSeen.length;
+    if (eventsFound < numGameweeks && eventsFound > 0) {
+        xP = (xP / eventsFound) * numGameweeks;
     }
-    
+
     return xP;
 }

@@ -38,7 +38,11 @@
 
         <div id="loading" class="loading">
             <div class="spinner"></div>
-            <p>Loading team statistics...</p>
+            <p id="loadingText">Loading team statistics...</p>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="loadingProgress"></div>
+            </div>
+            <p class="progress-pct" id="loadingPct">0%</p>
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
