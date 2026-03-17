@@ -40,21 +40,34 @@ async function fetchWithProxy(url) {
     }
 }
 
+function setLoadingProgress(pct, text) {
+    const fill = document.getElementById('loadingProgress');
+    const label = document.getElementById('loadingPct');
+    const msg = document.getElementById('loadingText');
+    if (fill) fill.style.width = pct + '%';
+    if (label) label.textContent = Math.round(pct) + '%';
+    if (msg && text) msg.textContent = text;
+}
+
 async function fetchTeamData() {
     try {
         console.log('Fetching team data...');
+        setLoadingProgress(5, 'Fetching team data...');
         
         // Fetch team data
         const teamData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/`);
         console.log('Team data fetched:', teamData);
+        setLoadingProgress(15, 'Fetching history...');
 
         // Fetch history
         const historyData = await fetchWithProxy(`${API_BASE}/entry/${TEAM_ID}/history/`);
         console.log('History fetched:', historyData);
+        setLoadingProgress(30, 'Fetching player data...');
 
         // Fetch bootstrap-static for global averages and players
         const bootstrapData = await fetchWithProxy(`${API_BASE}/bootstrap-static/`);
         console.log('Bootstrap data fetched');
+        setLoadingProgress(45, 'Fetching squad picks...');
 
         // Fetch latest gameweek picks
         const currentGW = teamData.current_event || historyData.current[historyData.current.length - 1]?.event;
@@ -68,6 +81,7 @@ async function fetchTeamData() {
                 console.log('Fetching player stats...');
                 for (let i = 0; i < picksData.picks.length; i++) {
                     const pick = picksData.picks[i];
+                    setLoadingProgress(45 + Math.round((i / picksData.picks.length) * 45), `Loading player ${i + 1} of ${picksData.picks.length}...`);
                     try {
                         // Add small delay between requests
                         if (i > 0) {
@@ -112,6 +126,7 @@ async function fetchTeamData() {
                     }
                 }
                 console.log('Finished fetching player stats');
+                setLoadingProgress(90, 'Loading chip history...');
             } catch (error) {
                 console.log('Could not fetch picks for current GW');
             }
@@ -136,6 +151,7 @@ async function fetchTeamData() {
             }
         }
 
+        setLoadingProgress(100, 'Done!');
         return { team: teamData, history: historyData, bootstrap: bootstrapData, captainData, picks: picksData };
     } catch (error) {
         console.error('Error details:', error);

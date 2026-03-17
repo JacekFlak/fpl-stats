@@ -232,6 +232,31 @@ h1 {
     font-size: 1.5em;
 }
 
+.progress-bar-wrap {
+    width: 260px;
+    max-width: 80%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    margin: 12px auto 4px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #00ff87, #04f5ff);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-pct {
+    font-size: 0.9em;
+    color: #00ff87;
+    margin: 0;
+    letter-spacing: 1px;
+}
+
 .spinner {
     width: 60px;
     height: 60px;
